@@ -91,7 +91,7 @@ def test_parse_model_output_handles_the_gliner2_shapes() -> None:
 
 def test_extract_node_fills_state_and_audits(monkeypatch) -> None:
     monkeypatch.setattr(nodes, "default_reader", lambda: FakeReader([("Person Name", "Vikram Bhosale", 0.99)]))
-    state: KYCState = {"raw_document": AADHAAR_FILE, "extracted_fields": {}, "documents": [], "validation_errors": [], "rbi_citations": [], "decision": "", "audit_log": []}
+    state: KYCState = {"raw_document": AADHAAR_FILE, "extracted_fields": {}, "documents": [], "validation_errors": [], "findings": [], "retrieved_rules": [], "rbi_citations": [], "decision": "", "audit_log": []}
     out = nodes.extract(state)
     assert out["extracted_fields"]["name"] == "VIKRAM BHOSALE"
     assert out["extracted_fields"]["aadhaar"] == "9999-4512-7782"
@@ -101,7 +101,7 @@ def test_extract_node_fills_state_and_audits(monkeypatch) -> None:
 
 
 def test_graph_masks_the_aadhaar_right_after_validate() -> None:
-    state: KYCState = {"raw_document": AADHAAR_FILE, "extracted_fields": {}, "documents": [], "validation_errors": [], "rbi_citations": [], "decision": "", "audit_log": []}
+    state: KYCState = {"raw_document": AADHAAR_FILE, "extracted_fields": {}, "documents": [], "validation_errors": [], "findings": [], "retrieved_rules": [], "rbi_citations": [], "decision": "", "audit_log": []}
     final = build_graph().invoke(state)
     assert final["validation_errors"] == ["Aadhaar must be masked as XXXX-XXXX-1234"]
     assert final["extracted_fields"]["aadhaar"] == "XXXX-XXXX-7782"

@@ -2,8 +2,11 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+from kyc_agent.config import get_settings
 from kyc_agent.extraction import extract_fields
+from kyc_agent.findings import build_findings
 from kyc_agent.pii_model import default_reader
+from kyc_agent.rules_index import default_index
 from kyc_agent.state import KYCState
 from kyc_agent.validators import (
     is_valid_aadhaar_masked,
@@ -73,8 +76,36 @@ def validate(state: KYCState) -> KYCState:
 
 
 def retrieve_rules(state: KYCState) -> KYCState:
-    logger.info("retrieve_rules: %d validation errors", len(state["validation_errors"]))
-    return state
+    """Turn the file's problems into findings, fetch the RBI paragraphs for each, cite the best hit."""
+    findings = build_findings(state)
+    index = default_index()
+    k = get_settings().retrieval_k
+    citations: list[str] = []
+    retrieved: list[dict[str, Any]] = []
+    seen_chunks: set[tuple[str, str]] = set()
+    queries = 0
+    for finding in findings:
+        for query in finding.queries:
+            queries += 1
+            hits = index.search(query, k)
+            for rank, hit in enumerate(hits):
+                citation = str(hit.metadata.get("citation", ""))
+                if (citation, hit.page_content) not in seen_chunks:
+                    seen_chunks.add((citation, hit.page_content))
+                    retrieved.append({"rule": finding.rule, "rank": rank, "citation": citation,
+                                      "heading": hit.metadata.get("heading", ""), "text": hit.page_content})
+                if rank == 0 and citation and citation not in citations:
+                    citations.append(citation)
+    logger.info("retrieve_rules: %d findings, %d queries, citations %s", len(findings), queries, citations)
+    entry = {"node": "retrieve_rules", "index": index.name, "findings": [f.rule + ("?" if f.tentative else "") for f in findings],
+             "queries": queries, "chunks": len(retrieved), "citations": citations}
+    return {
+        **state,
+        "findings": [finding.as_dict() for finding in findings],
+        "retrieved_rules": retrieved,
+        "rbi_citations": citations,
+        "audit_log": [*state["audit_log"], entry],
+    }
 
 
 def decide(state: KYCState) -> KYCState:

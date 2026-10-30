@@ -3,7 +3,7 @@
   "cases": 30,
   "decision_accuracy": 0.0,
   "decision_hits": 0,
-  "citation_hit_rate": 0.0,
+  "citation_hit_rate": 0.9411764705882353,
   "citation_cases": 17,
   "extraction_accuracy": 0.989247311827957,
   "extraction_hits": 276,

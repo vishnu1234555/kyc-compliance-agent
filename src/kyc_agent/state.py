@@ -10,6 +10,9 @@ class KYCState(TypedDict):
     # holding the fields that document shows, so later nodes can compare documents.
     documents: list[dict[str, Any]]
     validation_errors: list[str]
+    # retrieve_rules: what is wrong with the file (findings.py) and the RBI paragraphs fetched for it
+    findings: list[dict[str, Any]]
+    retrieved_rules: list[dict[str, Any]]
     rbi_citations: list[str]
     decision: Decision
     audit_log: list[dict[str, Any]]

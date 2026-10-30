@@ -10,10 +10,13 @@ The 2016 RBI KYC Master Direction was repealed on 28 Nov 2025. For NBFCs the rul
 RBI/DOR/2025-26/361, dated 28 Nov 2025, updated as on 29 Dec 2025
 https://rbi.org.in/Scripts/BS_ViewMasDirections.aspx?id=12943
 
-The paragraph numbers below were read from that page by Vishnu on 30-10-2026. The Claude
-session that wrote this file could not open rbi.org.in (the host is outside the session's
-allowed network), so **none of the paragraph numbers have been independently checked**. Check
-them against the page before relying on a citation in front of an auditor.
+The paragraph numbers below were read from that page by Vishnu on 30-10-2026. The session that
+wrote this file could not open rbi.org.in. The build session of 30-10-2026 (roadmap item 3)
+could, and checked all eight against the full text of the Directions on that page: **every
+paragraph number below is correct**; no citation was changed. (The PDF host
+`rbidocs.rbi.org.in` refused that session, so `data/` holds a PDF rendered from the page's
+text; see `data/SOURCE.md`.) The quotes in the table are paraphrases; the retriever returns the
+exact wording.
 
 Paragraphs relied on (never cite a paragraph that is not on this list unless you read it in
 the document yourself; if you add one, quote its sentence here):

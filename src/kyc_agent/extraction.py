@@ -95,6 +95,8 @@ def fields_for_block(block: Block, kept: list[Candidate]) -> dict[str, Any]:
     """The fields one document shows, from the candidates that survived arbitration inside it."""
     inside = [cand for cand in kept if block.contains(cand["start"])]
     out: dict[str, Any] = {"kind": block.kind, "title": block.title}
+    if block.kind == "note":
+        out["note"] = " ".join(block.body.split())  # a branch note is read as text, not fields
     for name, label in _LABEL_FOR.items():
         for cand in sorted((c for c in inside if c["label"] == label), key=_rank):
             value = _NORMALISE[name](cand["text"])

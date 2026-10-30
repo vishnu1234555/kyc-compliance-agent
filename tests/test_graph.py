@@ -8,6 +8,8 @@ def test_graph_runs_end_to_end() -> None:
         "extracted_fields": {},
         "documents": [],
         "validation_errors": [],
+        "findings": [],
+        "retrieved_rules": [],
         "rbi_citations": [],
         "decision": "",
         "audit_log": [],

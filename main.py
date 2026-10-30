@@ -32,6 +32,8 @@ def main() -> None:
         "extracted_fields": {},
         "documents": [],
         "validation_errors": [],
+        "findings": [],
+        "retrieved_rules": [],
         "rbi_citations": [],
         "decision": "",
         "audit_log": [],
