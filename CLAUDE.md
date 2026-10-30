@@ -7,20 +7,26 @@ Rules source: RBI/DOR/2025-26/361, dated 28 Nov 2025, updated as on 29 Dec 2025,
 ## Conventions
 - Python 3.11, src layout. Setup: `python3.11 -m venv .venv && .venv/bin/pip install -r requirements.txt -e .`
 - Test: `.venv/bin/python -m pytest -q`. Run once: `.venv/bin/python main.py`.
-- `logging` everywhere, `print` only in `main.py` and for the scorecard lines of `evals/run_evals.py`. Type hints on every function.
+- `logging` everywhere, `print` only in `main.py` and for the scorecard lines of the `evals/` scripts. Type hints on every function.
 - State lives only in `KYCState` (`src/kyc_agent/state.py`). Nodes are pure functions `KYCState -> KYCState`; add new fields to the TypedDict, never smuggle them through side channels.
 - Every node appends one entry to `audit_log`: a `"node"` key plus what it did, e.g. validate writes `{"node": "validate", "errors": n}`. NBFC auditors need the trail.
-- Secrets via `.env` (see `.env.example`), read through `config.get_settings()`.
+- Secrets via `.env` (see `.env.example`), read through `config.get_settings()`. Keys are never printed, logged or written.
+- A full Aadhaar number never leaves the process: `validate` masks it in the state right after checking it, the LLM sees masked fields only, LangSmith goes through the anonymizer in `tracing.py`, and the dataset upload is masked.
+- Every graph invoke/stream takes `run_config(thread_id)` (checkpointer thread id + tracer). `DECIDE_MODE` is `rules`, `llm` or `agent`.
+- Unit tests run offline: `tests/conftest.py` swaps in a null PII reader, a fake rules index, `DECIDE_MODE=rules` and a blank LangSmith key. Only `evals/` touches the real model, Gemini and LangSmith.
 - Keep PRs small: one node per PR.
 - RAG work uses LangChain components only (loaders, splitters, `langchain_chroma`). Never raw pypdf or hand-rolled retrieval.
 - Every PR that changes behaviour adds or updates an eval under `evals/` and reports the before/after score. No change without a number.
 - Vishnu must be able to explain every line. When a Claude session adds code, end with a short list of the new syntax it used, so it can be checked as the build goes.
 
-## Roadmap (do in order, one PR each)
-0. DONE 30 Oct 2026. `evals/`: 30 synthetic KYC cases (`evals/cases.json`) with expected fields, validate errors, decision and citations, plus `evals/run_evals.py`, which prints decision accuracy, citation hit rate, extraction accuracy and validate accuracy. Rules and field formats in `evals/POLICY.md`. Baseline on the skeleton: decision 0/30 = 0.0000, citation hit rate 0.0000 (17 cases with citations), extraction 0/279 = 0.0000, validate 30/30 = 1.0000. Run it before and after every later PR.
-1. `extract`: Vishnu's own fine-tuned GLiNER2 PII model, called as a tool -> `extracted_fields` (name, dob, pan, form60, aadhaar, address, pincode, doc_type, plus risk_category and last_kyc_date from the record header). Pydantic schema, no free-form JSON parsing. Formats are in `evals/POLICY.md` section 4: aadhaar is reported as printed (`XXXX-XXXX-1234`, or `9999-1234-5678` when the document shows it in full; extract must never mask it itself, validate checks that). extract must leave a field out when the file doesn't have it, because validate treats None as a wrong value.
-2. DONE 30 Oct. `validate`: deterministic checks only, exactly what `validators.py` does: PAN format, Aadhaar masked as XXXX-XXXX-1234, PIN code format, DOB valid and 18+. Populate `validation_errors`. No LLM here.
-3. `retrieve_rules`: LangChain `PyPDFLoader` + `RecursiveCharacterTextSplitter` on the NBFC KYC Directions, 2025 PDF into `langchain_chroma`, retrieve by `validation_errors`, fill `rbi_citations` with paragraph numbers in the `evals/POLICY.md` format (e.g. `para 42(1)`).
-4. `decide`: LLM given fields + errors + citations -> `decision`. Add conditional edge: `approve` skips `human_review`.
-5. `human_review`: LangGraph `interrupt()` + checkpointer so a reviewer can resume.
-6. LangSmith tracing on by default when LANGSMITH_API_KEY is set; wire the `evals/` scorecard to a LangSmith dataset.
+## Roadmap (done in order, one commit each on `claude/kyc-build`; details and blockers in `docs/PROGRESS.md`)
+0. DONE 30 Oct 2026. `evals/`: 30 synthetic KYC cases (`evals/cases.json`) with expected fields, validate errors, decision and citations, plus `evals/run_evals.py`. Rules and field formats in `evals/POLICY.md`. Baseline on the skeleton: decision 0/30, citation hit rate 0.0000, extraction 0/279, validate 30/30. Run it before and after every change.
+1. DONE 30 Oct. `extract`: regex reader + Vishnu's fine-tuned GLiNER2 PII model (`VK1402/AADHAAR_Extractor`, threshold 0.30) merged by the validation/arbitration ported from Aadhaar-Final; Pydantic schema; aadhaar reported as printed, never masked by extract; missing fields left out. Extraction 269/279 regex only -> 276/279 with the model (the model adds 7 unlabelled names). Cases got `tags`; three Aadhaar check digits were fixed (POLICY.md section 8).
+2. DONE 30 Oct. `validate`: deterministic checks (PAN, Aadhaar masked, PIN, DOB 18+); now also masks the Aadhaar number in the state right after recording the error.
+3. DONE 30 Oct. `retrieve_rules`: `PyPDFLoader` -> paragraph-number splitter with citation metadata -> `RecursiveCharacterTextSplitter` -> Gemini embeddings -> `langchain_chroma` over `data/rbi_nbfc_kyc_directions_2025_from_html.pdf` (rendered from the official page text; see `data/SOURCE.md`). Findings (`findings.py`) drive the queries. All eight POLICY paragraph numbers verified. Citation hit rate 0.9412.
+4. DONE 30 Oct. `decide`: `rules_decide` baseline (R1-R8 except R6) + Gemini Flash structured verdict on masked fields, errors and retrieved paragraphs; citations limited to retrieved paragraphs; approve skips `human_review`. The key's free tier (20 requests/day/model) cut the LLM run short: 25/30 with 7 rules fallbacks; rules alone 27/30.
+4b. DONE 30 Oct (code; 30-case numbers blocked by the quota). Agentic `decide`: Gemini chooses `search_rbi_rules`, `check_kyc_due`, `compare_across_documents`, ends with `submit_verdict`; max 5 calls, every call in the audit; a verdict needs the date check and both comparisons first; approve carries no citations. Live on 3 cases. Eval flags: `DECIDE_MODE=agent`, `EVAL_GOLD_FIELDS=1`, `EVAL_CASES=`.
+5. DONE 30 Oct. `human_review`: `interrupt()` + checkpointer (memory, or SQLite via `CHECKPOINT_DB`); the evals auto-resume as `eval-auto` and the scorecard says in how many cases.
+6. DONE 30 Oct. LangSmith tracing when `LANGSMITH_API_KEY` is set, through the 12-digit anonymizer; cases uploaded (masked) as dataset `kyc-compliance-agent-cases`; experiment `kyc-rules-a3974733` run against it.
+
+Next, when a billed Gemini key is available: the four 30-case decision numbers (rules, LLM without tools, LLM with tools, LLM with tools on gold fields), commands in `docs/PROGRESS.md`.

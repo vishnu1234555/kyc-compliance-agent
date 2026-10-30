@@ -12,7 +12,17 @@ is not `done`.
 | 4b agentic `decide` | done (code + 3-case live check); 30-case numbers blocked by quota | tool loop: search_rbi_rules, check_kyc_due, compare_across_documents, submit_verdict; max 5 investigation calls; every call in the audit entry |
 | 5 `human_review` | done | LangGraph interrupt() + checkpointer (memory, or SQLite via CHECKPOINT_DB); evals auto-resume as "eval-auto" and record it |
 | 6 LangSmith | done | tracer attached through run_config with the 12-digit anonymizer; dataset `kyc-compliance-agent-cases` (masked documents) uploaded; experiment `kyc-rules-a3974733` run against it |
-| Docs | pending | README, docs/WALKTHROUGH.md, CLAUDE.md roadmap |
+| Docs | done | README.md (graph, how to run, scorecard tables, limits), docs/WALKTHROUGH.md (per node, case 24 states, syntax), CLAUDE.md roadmap |
+
+## Scorecards, one line per commit
+
+| After | Decision | Rules only | Citations | Extraction regex+model | Regex only | Validate on extracted |
+|---|---|---|---|---|---|---|
+| baseline (skeleton) | 0/30 | - | 0.0000 | 0/279 | - | - |
+| item 1 | 0/30 | - | 0.0000 | 276/279 | 269/279 | 30/30 |
+| item 3 | 0/30 | - | 0.9412 | 276/279 | 269/279 | 30/30 |
+| item 4 (llm, 7 fallbacks) | 25/30 | 27/30 | 0.7157 | 276/279 | 269/279 | 30/30 |
+| item 4b, 5, 6 (rules mode) | 27/30 | 27/30 | 0.8529 | 276/279 | 269/279 | 30/30 |
 
 ## Blocked in this session (not faked in code)
 
