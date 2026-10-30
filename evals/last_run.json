@@ -1,0 +1,12 @@
+{
+  "cases": 30,
+  "decision_accuracy": 0.0,
+  "decision_hits": 0,
+  "citation_hit_rate": 0.0,
+  "citation_cases": 17,
+  "extraction_accuracy": 0.0,
+  "extraction_hits": 0,
+  "extraction_total": 279,
+  "validate_accuracy": 1.0,
+  "validate_hits": 30
+}
