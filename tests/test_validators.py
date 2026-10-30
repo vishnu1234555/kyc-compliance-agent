@@ -9,6 +9,7 @@ from kyc_agent.validators import (
     is_valid_dob,
     is_valid_pan,
     is_valid_pincode,
+    mask_aadhaar,
 )
 
 TODAY = date(2026, 10, 30)
@@ -58,6 +59,7 @@ def test_validate_node_collects_errors_and_audits() -> None:
     state: KYCState = {
         "raw_document": "",
         "extracted_fields": {"pan": "bad", "aadhaar": "XXXX-XXXX-1234", "pincode": "012345"},
+        "documents": [],
         "validation_errors": [],
         "rbi_citations": [],
         "decision": "",
@@ -65,5 +67,23 @@ def test_validate_node_collects_errors_and_audits() -> None:
     }
     out = validate(state)
     assert out["validation_errors"] == ["PAN format invalid", "PIN code invalid"]
-    assert out["audit_log"] == [{"node": "validate", "errors": 2}]
+    assert out["audit_log"] == [{"node": "validate", "errors": 2, "aadhaar_masked": False}]
     assert state["audit_log"] == []  # input not mutated
+
+
+def test_validate_node_masks_a_full_aadhaar_but_keeps_the_error() -> None:
+    state: KYCState = {
+        "raw_document": "",
+        "extracted_fields": {"aadhaar": "9999-4512-7782"},
+        "documents": [{"kind": "aadhaar", "aadhaar": "9999-4512-7782"}],
+        "validation_errors": [],
+        "rbi_citations": [],
+        "decision": "",
+        "audit_log": [],
+    }
+    out = validate(state)
+    assert out["validation_errors"] == ["Aadhaar must be masked as XXXX-XXXX-1234"]
+    assert out["extracted_fields"] == {"aadhaar": "XXXX-XXXX-7782"}
+    assert out["documents"] == [{"kind": "aadhaar", "aadhaar": "XXXX-XXXX-7782"}]
+    assert out["audit_log"][-1]["aadhaar_masked"] is True
+    assert mask_aadhaar("XXXX-XXXX-1234") == "XXXX-XXXX-1234"

@@ -6,6 +6,7 @@ def test_graph_runs_end_to_end() -> None:
     initial: KYCState = {
         "raw_document": "dummy",
         "extracted_fields": {},
+        "documents": [],
         "validation_errors": [],
         "rbi_citations": [],
         "decision": "",

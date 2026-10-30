@@ -91,6 +91,10 @@ Allowed `doc_type` values:
 - Address-only documents (R1 fires): `utility_bill`, `property_tax_receipt`, `pension_order`, `allotment_letter`
 - `null`: no identity document on file
 
+`extract` reads a 12-digit number as an Aadhaar number only when its Verhoeff check digit is
+right (the same rule as the PII project's validator), and treats a masked number as valid.
+`validate` still flags every unmasked number.
+
 Each field is taken from the first document that shows it. When documents disagree (R7 cases)
 the identity document's value is the expected one; the conflicting value only appears in `why`.
 
@@ -101,7 +105,10 @@ with the nulls dropped, in validate's own order (pan, aadhaar, pincode, dob). Th
 ## 5. The case file
 
 `cases.json` holds 30 cases. Keys per case: `id`, `raw_document`, `expected_fields`,
-`expected_errors`, `expected_decision`, `expected_citations`, `why`. `why` is one line and
+`expected_errors`, `expected_decision`, `expected_citations`, `why`, `tags`. `tags` is a list
+drawn from `unlabelled` (17 cases), `ocr_noise` (5), `no_titles` (3) and `unmasked_aadhaar`
+(4); the scorecard's labelled/unlabelled split reads the `unlabelled` tag, never case ids.
+`why` is one line and
 starts with the rules that fired, `R2+R4: ...` or `none: ...`; the tests parse that prefix and
 re-derive the decision and citations from the table above, so a mislabelled case fails CI.
 
@@ -172,6 +179,18 @@ to `evals/last_run.json` (committed, so a PR diff shows the before/after):
    cases whose error list equals `expected_errors`. This is 1.0 by construction and only drops if
    `validate` or the case file changes.
 
+Since roadmap item 1 the scorecard also prints, for the same run:
+
+5. **extraction, regex only**: extraction accuracy with the PII model switched off.
+6. **validate on extracted**: `nodes.validate` run on extract's own output; share of cases whose
+   error list equals `expected_errors`. Unlike number 4 this can drop when extraction is wrong.
+7. **A per-field table**: hits/total per field, regex+model next to regex only, each split into
+   the cases tagged `unlabelled` and the rest. The difference between the two halves is what
+   the model adds.
+
+Extraction is always scored on extract's own output, read from the graph stream before
+`validate` masks the Aadhaar number.
+
 Every PR that changes behaviour runs this before and after and reports both numbers.
 
 ## 7. Baseline (30-10-2026, skeleton at commit 49641a0, before any node is implemented)
@@ -218,3 +237,9 @@ and validate `ok`.)
 - **`print` is allowed in `evals/run_evals.py` for the scorecard only**; CLAUDE.md now says so.
 - **`pyproject.toml` gained `"."` on the pytest path and `evals/__init__.py` exists**, so the
   tests can import the scoring functions from the script.
+- **Three unmasked Aadhaar numbers were changed by their last digit on 30-10-2026** so that
+  they pass the Verhoeff check `extract` applies before it believes a 12-digit run is an
+  Aadhaar number: case 14 `9999 4512 7788` -> `9999 4512 7782`, case 21 `9999 6543 2109` ->
+  `9999 6543 2101`, case 30 `9999 3344 5566` -> `9999 3344 5565`, in `raw_document` and in
+  `expected_fields`. Labels, errors and citations are unchanged. Case 20's `9999 7788 1122`
+  already passed.

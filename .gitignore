@@ -4,3 +4,9 @@ __pycache__/
 *.pyc
 .pytest_cache/
 *.egg-info/
+# local copies of the PII model weights (downloaded from Hugging Face on first use)
+models/
+# the Chroma vector store is rebuilt from data/ on demand
+data/chroma/
+*.sqlite
+*.sqlite3

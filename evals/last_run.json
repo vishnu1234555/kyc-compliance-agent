@@ -1,12 +1,322 @@
 {
+  "pii_model": "VK1402/AADHAAR_Extractor @ 0.30",
   "cases": 30,
   "decision_accuracy": 0.0,
   "decision_hits": 0,
   "citation_hit_rate": 0.0,
   "citation_cases": 17,
-  "extraction_accuracy": 0.0,
-  "extraction_hits": 0,
+  "extraction_accuracy": 0.989247311827957,
+  "extraction_hits": 276,
   "extraction_total": 279,
+  "extraction_regex_accuracy": 0.96415770609319,
+  "extraction_regex_hits": 269,
+  "extraction_regex_total": 279,
   "validate_accuracy": 1.0,
-  "validate_hits": 30
+  "validate_hits": 30,
+  "validate_extracted_accuracy": 1.0,
+  "validate_extracted_hits": 30,
+  "labelled_cases": 13,
+  "unlabelled_cases": 17,
+  "per_field": {
+    "name": {
+      "model": {
+        "all": [
+          28,
+          30
+        ],
+        "labelled": [
+          13,
+          13
+        ],
+        "unlabelled": [
+          15,
+          17
+        ]
+      },
+      "regex": {
+        "all": [
+          21,
+          30
+        ],
+        "labelled": [
+          13,
+          13
+        ],
+        "unlabelled": [
+          8,
+          17
+        ]
+      }
+    },
+    "dob": {
+      "model": {
+        "all": [
+          29,
+          29
+        ],
+        "labelled": [
+          12,
+          12
+        ],
+        "unlabelled": [
+          17,
+          17
+        ]
+      },
+      "regex": {
+        "all": [
+          29,
+          29
+        ],
+        "labelled": [
+          12,
+          12
+        ],
+        "unlabelled": [
+          17,
+          17
+        ]
+      }
+    },
+    "pan": {
+      "model": {
+        "all": [
+          26,
+          26
+        ],
+        "labelled": [
+          11,
+          11
+        ],
+        "unlabelled": [
+          15,
+          15
+        ]
+      },
+      "regex": {
+        "all": [
+          26,
+          26
+        ],
+        "labelled": [
+          11,
+          11
+        ],
+        "unlabelled": [
+          15,
+          15
+        ]
+      }
+    },
+    "form60": {
+      "model": {
+        "all": [
+          30,
+          30
+        ],
+        "labelled": [
+          13,
+          13
+        ],
+        "unlabelled": [
+          17,
+          17
+        ]
+      },
+      "regex": {
+        "all": [
+          30,
+          30
+        ],
+        "labelled": [
+          13,
+          13
+        ],
+        "unlabelled": [
+          17,
+          17
+        ]
+      }
+    },
+    "aadhaar": {
+      "model": {
+        "all": [
+          14,
+          14
+        ],
+        "labelled": [
+          4,
+          4
+        ],
+        "unlabelled": [
+          10,
+          10
+        ]
+      },
+      "regex": {
+        "all": [
+          14,
+          14
+        ],
+        "labelled": [
+          4,
+          4
+        ],
+        "unlabelled": [
+          10,
+          10
+        ]
+      }
+    },
+    "address": {
+      "model": {
+        "all": [
+          29,
+          30
+        ],
+        "labelled": [
+          13,
+          13
+        ],
+        "unlabelled": [
+          16,
+          17
+        ]
+      },
+      "regex": {
+        "all": [
+          29,
+          30
+        ],
+        "labelled": [
+          13,
+          13
+        ],
+        "unlabelled": [
+          16,
+          17
+        ]
+      }
+    },
+    "pincode": {
+      "model": {
+        "all": [
+          30,
+          30
+        ],
+        "labelled": [
+          13,
+          13
+        ],
+        "unlabelled": [
+          17,
+          17
+        ]
+      },
+      "regex": {
+        "all": [
+          30,
+          30
+        ],
+        "labelled": [
+          13,
+          13
+        ],
+        "unlabelled": [
+          17,
+          17
+        ]
+      }
+    },
+    "doc_type": {
+      "model": {
+        "all": [
+          30,
+          30
+        ],
+        "labelled": [
+          13,
+          13
+        ],
+        "unlabelled": [
+          17,
+          17
+        ]
+      },
+      "regex": {
+        "all": [
+          30,
+          30
+        ],
+        "labelled": [
+          13,
+          13
+        ],
+        "unlabelled": [
+          17,
+          17
+        ]
+      }
+    },
+    "risk_category": {
+      "model": {
+        "all": [
+          30,
+          30
+        ],
+        "labelled": [
+          13,
+          13
+        ],
+        "unlabelled": [
+          17,
+          17
+        ]
+      },
+      "regex": {
+        "all": [
+          30,
+          30
+        ],
+        "labelled": [
+          13,
+          13
+        ],
+        "unlabelled": [
+          17,
+          17
+        ]
+      }
+    },
+    "last_kyc_date": {
+      "model": {
+        "all": [
+          30,
+          30
+        ],
+        "labelled": [
+          13,
+          13
+        ],
+        "unlabelled": [
+          17,
+          17
+        ]
+      },
+      "regex": {
+        "all": [
+          30,
+          30
+        ],
+        "labelled": [
+          13,
+          13
+        ],
+        "unlabelled": [
+          17,
+          17
+        ]
+      }
+    }
+  }
 }

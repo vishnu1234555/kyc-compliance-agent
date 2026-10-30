@@ -2,6 +2,11 @@
 
 Run: .venv/bin/python evals/run_evals.py   (set LOG_LEVEL=INFO for one log line per case)
 The rules behind the expected labels are in evals/POLICY.md.
+
+Extraction is scored on extract's own output, taken from the graph stream before validate
+masks the Aadhaar number, and a second time with the PII model switched off (regex only), so
+the per-field table shows what the model adds. Validate is scored twice as well: on the
+expected fields (1.0 by construction) and on the extracted fields.
 """
 
 import json
@@ -12,8 +17,11 @@ from typing import Any
 
 from langgraph.graph.state import CompiledStateGraph
 
+from kyc_agent.config import get_settings
+from kyc_agent.extraction import extract_fields
 from kyc_agent.graph import build_graph
 from kyc_agent.nodes import validate
+from kyc_agent.pii_model import NullReader
 from kyc_agent.state import KYCState
 
 logger = logging.getLogger("evals")
@@ -22,6 +30,7 @@ EVALS_DIR = Path(__file__).resolve().parent
 CASES_PATH = EVALS_DIR / "cases.json"
 LAST_RUN_PATH = EVALS_DIR / "last_run.json"
 
+FIELDS = ("name", "dob", "pan", "form60", "aadhaar", "address", "pincode", "doc_type", "risk_category", "last_kyc_date")
 Score = tuple[int, int]  # (hits, total)
 
 
@@ -35,6 +44,7 @@ def fresh_state(raw_document: str) -> KYCState:
     return {
         "raw_document": raw_document,
         "extracted_fields": {},
+        "documents": [],
         "validation_errors": [],
         "rbi_citations": [],
         "decision": "",
@@ -63,98 +73,174 @@ def score_citations(expected: list[str], got: list[str]) -> Score:
     return (hits, len(expected))
 
 
+def score_each_field(expected: dict[str, Any], got: dict[str, Any]) -> dict[str, Score]:
+    """One (hit, 1) per non-null expected field."""
+    scores: dict[str, Score] = {}
+    for key, value in drop_nulls(expected).items():
+        scores[key] = (1 if key in got and got[key] == value else 0, 1)
+    return scores
+
+
 def score_fields(expected: dict[str, Any], got: dict[str, Any]) -> Score:
-    wanted = drop_nulls(expected)
-    hits = 0
-    for key, value in wanted.items():
-        if key in got and got[key] == value:
-            hits += 1
-    return (hits, len(wanted))
+    each = score_each_field(expected, got)
+    return (sum(hit for hit, _ in each.values()), len(each))
 
 
-def score_validate(expected_fields: dict[str, Any], expected_errors: list[str]) -> Score:
+def score_validate_on(fields: dict[str, Any], expected_errors: list[str]) -> Score:
+    """Does the validate node, run on `fields`, produce exactly `expected_errors`?"""
     state = fresh_state("")
-    state["extracted_fields"] = drop_nulls(expected_fields)
+    state["extracted_fields"] = drop_nulls(fields)
     got = validate(state)["validation_errors"]
     return (1 if got == expected_errors else 0, 1)
 
 
+def score_validate(expected_fields: dict[str, Any], expected_errors: list[str]) -> Score:
+    return score_validate_on(expected_fields, expected_errors)
+
+
+def run_graph(graph: CompiledStateGraph, raw_document: str) -> tuple[dict[str, Any], KYCState]:
+    """(extract's own output, before validate masks it; the final state)."""
+    extracted: dict[str, Any] = {}
+    final: KYCState | None = None
+    for mode, chunk in graph.stream(fresh_state(raw_document), stream_mode=["updates", "values"]):
+        if mode == "updates" and "extract" in chunk:
+            extracted = chunk["extract"].get("extracted_fields", {})
+        elif mode == "values":
+            final = chunk
+    if final is None:
+        raise RuntimeError("the graph produced no state")
+    return extracted, final
+
+
 def run_case(graph: CompiledStateGraph, case: dict[str, Any]) -> dict[str, Any]:
-    final = graph.invoke(fresh_state(case["raw_document"]))
+    extracted, final = run_graph(graph, case["raw_document"])
+    regex_only = extract_fields(case["raw_document"], NullReader()).fields
     logger.info("%s: decision expected %r, got %r", case["id"], case["expected_decision"], final["decision"])
     return {
         "id": case["id"],
+        "tags": case.get("tags", []),
         "expected_decision": case["expected_decision"],
         "got_decision": final["decision"],
         "decision": score_decision(case["expected_decision"], final["decision"]),
         "citations": score_citations(case["expected_citations"], final["rbi_citations"]),
-        "fields": score_fields(case["expected_fields"], final["extracted_fields"]),
+        "fields": score_fields(case["expected_fields"], extracted),
+        "fields_regex": score_fields(case["expected_fields"], regex_only),
+        "each_field": score_each_field(case["expected_fields"], extracted),
+        "each_field_regex": score_each_field(case["expected_fields"], regex_only),
         "validate": score_validate(case["expected_fields"], case["expected_errors"]),
+        "validate_extracted": score_validate_on(extracted, case["expected_errors"]),
     }
+
+
+def _add(total: Score, part: Score) -> Score:
+    return (total[0] + part[0], total[1] + part[1])
+
+
+def per_field_table(rows: list[dict[str, Any]]) -> dict[str, dict[str, dict[str, Score]]]:
+    """field -> reader ("model" | "regex") -> split ("all" | "labelled" | "unlabelled") -> (hits, total)."""
+    table: dict[str, dict[str, dict[str, Score]]] = {}
+    for field in FIELDS:
+        table[field] = {reader: {split: (0, 0) for split in ("all", "labelled", "unlabelled")} for reader in ("model", "regex")}
+    for row in rows:
+        split = "unlabelled" if "unlabelled" in row.get("tags", []) else "labelled"
+        for reader, key in (("model", "each_field"), ("regex", "each_field_regex")):
+            for field, score in row.get(key, {}).items():
+                table[field][reader]["all"] = _add(table[field][reader]["all"], score)
+                table[field][reader][split] = _add(table[field][reader][split], score)
+    return table
 
 
 def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
     decision_hits = 0
     citation_rates: list[float] = []
-    field_hits = 0
-    field_total = 0
+    fields: Score = (0, 0)
+    fields_regex: Score = (0, 0)
     validate_hits = 0
+    validate_extracted_hits = 0
+    unlabelled = 0
     for row in rows:
         decision_hits += row["decision"][0]
         hits, total = row["citations"]
         if total > 0:
             citation_rates.append(hits / total)
-        field_hits += row["fields"][0]
-        field_total += row["fields"][1]
+        fields = _add(fields, row["fields"])
+        fields_regex = _add(fields_regex, row.get("fields_regex", (0, 0)))
         validate_hits += row["validate"][0]
+        validate_extracted_hits += row.get("validate_extracted", (0, 1))[0]
+        if "unlabelled" in row.get("tags", []):
+            unlabelled += 1
     return {
         "cases": len(rows),
         "decision_accuracy": safe_divide(decision_hits, len(rows)),
         "decision_hits": decision_hits,
         "citation_hit_rate": safe_divide(sum(citation_rates), len(citation_rates)),
         "citation_cases": len(citation_rates),
-        "extraction_accuracy": safe_divide(field_hits, field_total),
-        "extraction_hits": field_hits,
-        "extraction_total": field_total,
+        "extraction_accuracy": safe_divide(*fields),
+        "extraction_hits": fields[0],
+        "extraction_total": fields[1],
+        "extraction_regex_accuracy": safe_divide(*fields_regex),
+        "extraction_regex_hits": fields_regex[0],
+        "extraction_regex_total": fields_regex[1],
         "validate_accuracy": safe_divide(validate_hits, len(rows)),
         "validate_hits": validate_hits,
+        "validate_extracted_accuracy": safe_divide(validate_extracted_hits, len(rows)),
+        "validate_extracted_hits": validate_extracted_hits,
+        "labelled_cases": len(rows) - unlabelled,
+        "unlabelled_cases": unlabelled,
+        "per_field": per_field_table(rows),
     }
 
 
 def has_miss(row: dict[str, Any]) -> bool:
-    for key in ("decision", "citations", "fields", "validate"):
-        if row[key][0] < row[key][1]:
+    for key in ("decision", "citations", "fields", "validate", "validate_extracted"):
+        hits, total = row.get(key, (0, 0))
+        if hits < total:
             return True
     return False
 
 
-def print_scorecard(summary: dict[str, Any], rows: list[dict[str, Any]]) -> None:
+def _ratio(score: Score) -> str:
+    return f"{score[0]}/{score[1]}"
+
+
+def print_scorecard(summary: dict[str, Any], rows: list[dict[str, Any]], reader: str) -> None:
     n = summary["cases"]
-    print(f"KYC EVALS - {n} cases")
-    print(f"  decision accuracy    {summary['decision_hits']}/{n} = {summary['decision_accuracy']:.4f}")
-    print(f"  citation hit rate    {summary['citation_hit_rate']:.4f} (mean over {summary['citation_cases']} cases with expected citations)")
-    print(f"  extraction accuracy  {summary['extraction_hits']}/{summary['extraction_total']} = {summary['extraction_accuracy']:.4f}")
-    print(f"  validate accuracy    {summary['validate_hits']}/{n} = {summary['validate_accuracy']:.4f}")
+    print(f"KYC EVALS - {n} cases (PII model: {reader})")
+    print(f"  decision accuracy       {summary['decision_hits']}/{n} = {summary['decision_accuracy']:.4f}")
+    print(f"  citation hit rate       {summary['citation_hit_rate']:.4f} (mean over {summary['citation_cases']} cases with expected citations)")
+    print(f"  extraction accuracy     {summary['extraction_hits']}/{summary['extraction_total']} = {summary['extraction_accuracy']:.4f} (regex + PII model, extract's output before masking)")
+    print(f"  extraction, regex only  {summary['extraction_regex_hits']}/{summary['extraction_regex_total']} = {summary['extraction_regex_accuracy']:.4f}")
+    print(f"  validate accuracy       {summary['validate_hits']}/{n} = {summary['validate_accuracy']:.4f} (on expected fields; 1.0 by construction)")
+    print(f"  validate on extracted   {summary['validate_extracted_hits']}/{n} = {summary['validate_extracted_accuracy']:.4f} (validate(extract output) == expected_errors)")
+    print(f"\nPer field, hits/total. lab = {summary['labelled_cases']} cases with every value labelled, unlab = {summary['unlabelled_cases']} cases tagged unlabelled.")
+    print(f"  {'field':<14} {'regex+model':<26} {'regex only':<26}")
+    print(f"  {'':<14} {'all':<8} {'lab':<8} {'unlab':<8}  {'all':<8} {'lab':<8} {'unlab':<8}")
+    for field, readers in summary["per_field"].items():
+        model, regex = readers["model"], readers["regex"]
+        print(f"  {field:<14} {_ratio(model['all']):<8} {_ratio(model['labelled']):<8} {_ratio(model['unlabelled']):<8}  "
+              f"{_ratio(regex['all']):<8} {_ratio(regex['labelled']):<8} {_ratio(regex['unlabelled']):<8}")
     misses = [row for row in rows if has_miss(row)]
     print(f"\nMisses: {len(misses)} of {n} cases")
     if misses:
-        print(f"  {'case':<8} {'decision expected -> got':<28} {'citations':<10} {'fields':<8} validate")
+        print(f"  {'case':<8} {'decision expected -> got':<28} {'citations':<10} {'fields':<8} {'regex':<8} {'validate':<9} val(extr)")
     for row in misses:
         decision = f"{row['expected_decision']} -> {row['got_decision']!r}"
-        citations = "-" if row["citations"][1] == 0 else f"{row['citations'][0]}/{row['citations'][1]}"
-        fields = f"{row['fields'][0]}/{row['fields'][1]}"
+        citations = "-" if row["citations"][1] == 0 else _ratio(row["citations"])
         validate_ok = "ok" if row["validate"][0] == 1 else "MISS"
-        print(f"  {row['id']:<8} {decision:<28} {citations:<10} {fields:<8} {validate_ok}")
+        extracted_ok = "ok" if row.get("validate_extracted", (1, 1))[0] == 1 else "MISS"
+        print(f"  {row['id']:<8} {decision:<28} {citations:<10} {_ratio(row['fields']):<8} {_ratio(row.get('fields_regex', (0, 0))):<8} {validate_ok:<9} {extracted_ok}")
 
 
 def main() -> None:
     logging.basicConfig(level=os.environ.get("LOG_LEVEL", "WARNING"), format="%(levelname)s %(name)s: %(message)s")
+    settings = get_settings()
+    reader = f"{settings.pii_model} @ {settings.pii_threshold:.2f}"
     cases = load_cases()
     graph = build_graph()
     rows = [run_case(graph, case) for case in cases]
     summary = summarise(rows)
-    print_scorecard(summary, rows)
-    LAST_RUN_PATH.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    print_scorecard(summary, rows, reader)
+    LAST_RUN_PATH.write_text(json.dumps({"pii_model": reader, **summary}, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

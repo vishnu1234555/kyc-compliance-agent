@@ -31,3 +31,15 @@ def is_valid_dob(dob: str, today: date | None = None) -> bool:
     today = today or date.today()
     age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
     return age >= 18
+
+
+def mask_aadhaar(value: str) -> str:
+    """XXXX-XXXX-<last four> for a full 12-digit Aadhaar number; anything else comes back unchanged.
+
+    RBI para 23 Explanation 1 asks for the number to be redacted, so once validate has seen
+    it, nothing downstream (state, traces, the LLM) gets the full number.
+    """
+    digits = re.sub(r"\D", "", value)
+    if len(digits) == 12:
+        return f"XXXX-XXXX-{digits[-4:]}"
+    return value

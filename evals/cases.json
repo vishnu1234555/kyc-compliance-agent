@@ -17,7 +17,10 @@
     "expected_errors": [],
     "expected_decision": "approve",
     "expected_citations": [],
-    "why": "none: passport is an OVD, PAN valid, no Aadhaar on file (allowed), medium risk updated 2022; nothing fires"
+    "why": "none: passport is an OVD, PAN valid, no Aadhaar on file (allowed), medium risk updated 2022; nothing fires",
+    "tags": [
+      "unlabelled"
+    ]
   },
   {
     "id": "case-02",
@@ -37,7 +40,11 @@
     "expected_errors": [],
     "expected_decision": "approve",
     "expected_citations": [],
-    "why": "none: masked Aadhaar is an OVD, PAN valid, low risk updated 2020; nothing fires (no document titles, values unlabeled)"
+    "why": "none: masked Aadhaar is an OVD, PAN valid, low risk updated 2020; nothing fires (no document titles, values unlabeled)",
+    "tags": [
+      "unlabelled",
+      "no_titles"
+    ]
   },
   {
     "id": "case-03",
@@ -57,7 +64,8 @@
     "expected_errors": [],
     "expected_decision": "approve",
     "expected_citations": [],
-    "why": "none: voter ID is an OVD, Form 60 instead of PAN is allowed, medium risk updated 2023; nothing fires"
+    "why": "none: voter ID is an OVD, Form 60 instead of PAN is allowed, medium risk updated 2023; nothing fires",
+    "tags": []
   },
   {
     "id": "case-04",
@@ -77,7 +85,8 @@
     "expected_errors": [],
     "expected_decision": "approve",
     "expected_citations": [],
-    "why": "none: driving licence is an OVD, PAN valid, no Aadhaar at all (allowed), high risk updated 09-03-2026 (due 09-03-2028); nothing fires"
+    "why": "none: driving licence is an OVD, PAN valid, no Aadhaar at all (allowed), high risk updated 09-03-2026 (due 09-03-2028); nothing fires",
+    "tags": []
   },
   {
     "id": "case-05",
@@ -97,7 +106,11 @@
     "expected_errors": [],
     "expected_decision": "approve",
     "expected_citations": [],
-    "why": "none: NREGA job card signed by a State Govt officer is an OVD, PAN valid once OCR 'l' is read as '1', low risk updated 2019; nothing fires"
+    "why": "none: NREGA job card signed by a State Govt officer is an OVD, PAN valid once OCR 'l' is read as '1', low risk updated 2019; nothing fires",
+    "tags": [
+      "unlabelled",
+      "ocr_noise"
+    ]
   },
   {
     "id": "case-06",
@@ -117,7 +130,10 @@
     "expected_errors": [],
     "expected_decision": "approve",
     "expected_citations": [],
-    "why": "none: NPR letter with name and address is an OVD, masked Aadhaar, PAN valid, medium risk updated 2021; nothing fires"
+    "why": "none: NPR letter with name and address is an OVD, masked Aadhaar, PAN valid, medium risk updated 2021; nothing fires",
+    "tags": [
+      "unlabelled"
+    ]
   },
   {
     "id": "case-07",
@@ -137,7 +153,11 @@
     "expected_errors": [],
     "expected_decision": "approve",
     "expected_citations": [],
-    "why": "none: masked Aadhaar (OCR 'O' is '0') is an OVD, PAN valid, high risk updated 18-05-2026 (due 18-05-2028); nothing fires"
+    "why": "none: masked Aadhaar (OCR 'O' is '0') is an OVD, PAN valid, high risk updated 18-05-2026 (due 18-05-2028); nothing fires",
+    "tags": [
+      "unlabelled",
+      "ocr_noise"
+    ]
   },
   {
     "id": "case-08",
@@ -157,7 +177,8 @@
     "expected_errors": [],
     "expected_decision": "approve",
     "expected_citations": [],
-    "why": "none: passport is an OVD, adult (19), PAN valid, masked Aadhaar, low risk updated 2025; nothing fires"
+    "why": "none: passport is an OVD, adult (19), PAN valid, masked Aadhaar, low risk updated 2025; nothing fires",
+    "tags": []
   },
   {
     "id": "case-09",
@@ -177,7 +198,10 @@
     "expected_errors": [],
     "expected_decision": "approve",
     "expected_citations": [],
-    "why": "none: voter ID is an OVD, PAN valid (unlabeled on the card), medium risk updated 2024; nothing fires"
+    "why": "none: voter ID is an OVD, PAN valid (unlabeled on the card), medium risk updated 2024; nothing fires",
+    "tags": [
+      "unlabelled"
+    ]
   },
   {
     "id": "case-10",
@@ -200,7 +224,10 @@
       "para 5(1)(xiv)",
       "para 23(3)"
     ],
-    "why": "R1: the only identity document is an electricity bill, which proves address only; no OVD on file"
+    "why": "R1: the only identity document is an electricity bill, which proves address only; no OVD on file",
+    "tags": [
+      "unlabelled"
+    ]
   },
   {
     "id": "case-11",
@@ -223,7 +250,8 @@
       "para 5(1)(xiv)",
       "para 23(3)"
     ],
-    "why": "R1: a property tax receipt proves address only; no OVD on file"
+    "why": "R1: a property tax receipt proves address only; no OVD on file",
+    "tags": []
   },
   {
     "id": "case-12",
@@ -247,7 +275,10 @@
     "expected_citations": [
       "para 23(5)"
     ],
-    "why": "R2: PAN on file is 9 characters (check letter missing), so the format is wrong"
+    "why": "R2: PAN on file is 9 characters (check letter missing), so the format is wrong",
+    "tags": [
+      "unlabelled"
+    ]
   },
   {
     "id": "case-13",
@@ -269,17 +300,20 @@
     "expected_citations": [
       "para 23(5)"
     ],
-    "why": "R2: no PAN and no Form 60 anywhere in the file"
+    "why": "R2: no PAN and no Form 60 anywhere in the file",
+    "tags": [
+      "unlabelled"
+    ]
   },
   {
     "id": "case-14",
-    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10014\nRisk category: Medium\nLast KYC date: 25-03-2022\n\nGovernment of India\nUnique Identification Authority of India\nVikram Bhosale\nDOB: 06/06/1977\nMALE\n9999 4512 7788\nAddress: 51 Dharampeth, Nagpur, Maharashtra\n440010\n\nINCOME TAX DEPARTMENT\nGOVT. OF INDIA\nPermanent Account Number Card\nMQAPB1930D\nVIKRAM BHOSALE\n06/06/1977\n",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10014\nRisk category: Medium\nLast KYC date: 25-03-2022\n\nGovernment of India\nUnique Identification Authority of India\nVikram Bhosale\nDOB: 06/06/1977\nMALE\n9999 4512 7782\nAddress: 51 Dharampeth, Nagpur, Maharashtra\n440010\n\nINCOME TAX DEPARTMENT\nGOVT. OF INDIA\nPermanent Account Number Card\nMQAPB1930D\nVIKRAM BHOSALE\n06/06/1977\n",
     "expected_fields": {
       "name": "VIKRAM BHOSALE",
       "dob": "06-06-1977",
       "pan": "MQAPB1930D",
       "form60": false,
-      "aadhaar": "9999-4512-7788",
+      "aadhaar": "9999-4512-7782",
       "address": "51 Dharampeth, Nagpur, Maharashtra",
       "pincode": "440010",
       "doc_type": "aadhaar",
@@ -293,7 +327,12 @@
     "expected_citations": [
       "para 23 Explanation 1"
     ],
-    "why": "R3: the Aadhaar number is visible in full on the card copy; it must be masked"
+    "why": "R3: the Aadhaar number is visible in full on the card copy; it must be masked",
+    "tags": [
+      "unlabelled",
+      "no_titles",
+      "unmasked_aadhaar"
+    ]
   },
   {
     "id": "case-15",
@@ -315,7 +354,10 @@
     "expected_citations": [
       "para 42(1)"
     ],
-    "why": "R4: high-risk file last updated 15-06-2023; the 2-year limit passed on 15-06-2025 (PIN OCR 'O' is '0')"
+    "why": "R4: high-risk file last updated 15-06-2023; the 2-year limit passed on 15-06-2025 (PIN OCR 'O' is '0')",
+    "tags": [
+      "ocr_noise"
+    ]
   },
   {
     "id": "case-16",
@@ -337,7 +379,10 @@
     "expected_citations": [
       "para 42(1)"
     ],
-    "why": "R4: low-risk file last updated 20-01-2015; the 10-year limit passed on 20-01-2025 (DOB OCR 'O' is '0', PAN card confirms)"
+    "why": "R4: low-risk file last updated 20-01-2015; the 10-year limit passed on 20-01-2025 (DOB OCR 'O' is '0', PAN card confirms)",
+    "tags": [
+      "ocr_noise"
+    ]
   },
   {
     "id": "case-17",
@@ -359,7 +404,8 @@
     ],
     "expected_decision": "re_kyc",
     "expected_citations": [],
-    "why": "R5: PIN on file has 5 digits and the missing digit cannot be known"
+    "why": "R5: PIN on file has 5 digits and the missing digit cannot be known",
+    "tags": []
   },
   {
     "id": "case-18",
@@ -381,7 +427,8 @@
     ],
     "expected_decision": "re_kyc",
     "expected_citations": [],
-    "why": "R5: PIN on file starts with 0, which no Indian PIN does"
+    "why": "R5: PIN on file starts with 0, which no Indian PIN does",
+    "tags": []
   },
   {
     "id": "case-19",
@@ -406,7 +453,10 @@
       "para 23(5)",
       "para 42(1)"
     ],
-    "why": "R2+R4: PAN has only 3 digits; medium-risk file last updated 11-11-2016, the 8-year limit passed on 11-11-2024"
+    "why": "R2+R4: PAN has only 3 digits; medium-risk file last updated 11-11-2016, the 8-year limit passed on 11-11-2024",
+    "tags": [
+      "unlabelled"
+    ]
   },
   {
     "id": "case-20",
@@ -432,17 +482,20 @@
       "para 23(3)",
       "para 23 Explanation 1"
     ],
-    "why": "R1+R3: a pension payment order proves address only, no OVD on file; and it prints the Aadhaar number in full"
+    "why": "R1+R3: a pension payment order proves address only, no OVD on file; and it prints the Aadhaar number in full",
+    "tags": [
+      "unmasked_aadhaar"
+    ]
   },
   {
     "id": "case-21",
-    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10021\nRisk category: Medium\nLast KYC date: 19-07-2022\n\nGovernment of India\nUnique Identification Authority of India\nSneha Patil\nDOB: 02/09/1991\nFEMALE\n9999 6543 2109\nAddress: 30 Deccan Gymkhana, Pune, Maharashtra\n41100\n\nINCOME TAX DEPARTMENT\nPermanent Account Number Card\nUVDPP8123R\nSNEHA PATIL\n02/09/1991\n",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10021\nRisk category: Medium\nLast KYC date: 19-07-2022\n\nGovernment of India\nUnique Identification Authority of India\nSneha Patil\nDOB: 02/09/1991\nFEMALE\n9999 6543 2101\nAddress: 30 Deccan Gymkhana, Pune, Maharashtra\n41100\n\nINCOME TAX DEPARTMENT\nPermanent Account Number Card\nUVDPP8123R\nSNEHA PATIL\n02/09/1991\n",
     "expected_fields": {
       "name": "SNEHA PATIL",
       "dob": "02-09-1991",
       "pan": "UVDPP8123R",
       "form60": false,
-      "aadhaar": "9999-6543-2109",
+      "aadhaar": "9999-6543-2101",
       "address": "30 Deccan Gymkhana, Pune, Maharashtra",
       "pincode": "41100",
       "doc_type": "aadhaar",
@@ -457,7 +510,12 @@
     "expected_citations": [
       "para 23 Explanation 1"
     ],
-    "why": "R3+R5: Aadhaar number visible in full; PIN has only 5 digits"
+    "why": "R3+R5: Aadhaar number visible in full; PIN has only 5 digits",
+    "tags": [
+      "unlabelled",
+      "no_titles",
+      "unmasked_aadhaar"
+    ]
   },
   {
     "id": "case-22",
@@ -479,7 +537,10 @@
     "expected_citations": [
       "para 17(1)"
     ],
-    "why": "R6: 'Test Customer' is a fictitious name, so the account looks anonymous or benami"
+    "why": "R6: 'Test Customer' is a fictitious name, so the account looks anonymous or benami",
+    "tags": [
+      "unlabelled"
+    ]
   },
   {
     "id": "case-23",
@@ -501,7 +562,8 @@
     "expected_citations": [
       "para 17(1)"
     ],
-    "why": "R6: 'XYZ' is a placeholder, not a real name"
+    "why": "R6: 'XYZ' is a placeholder, not a real name",
+    "tags": []
   },
   {
     "id": "case-24",
@@ -523,7 +585,10 @@
     "expected_citations": [
       "para 17(2)"
     ],
-    "why": "R7: the passport says Anjali Mehra but the PAN card says Anjali Malhotra; CDD cannot be completed"
+    "why": "R7: the passport says Anjali Mehra but the PAN card says Anjali Malhotra; CDD cannot be completed",
+    "tags": [
+      "unlabelled"
+    ]
   },
   {
     "id": "case-25",
@@ -545,7 +610,11 @@
     "expected_citations": [
       "para 17(2)"
     ],
-    "why": "R7: date of birth is 1988 on the Aadhaar card and 1986 on the PAN card (PAN OCR 'I' is '1'); CDD cannot be completed"
+    "why": "R7: date of birth is 1988 on the Aadhaar card and 1986 on the PAN card (PAN OCR 'I' is '1'); CDD cannot be completed",
+    "tags": [
+      "unlabelled",
+      "ocr_noise"
+    ]
   },
   {
     "id": "case-26",
@@ -570,7 +639,8 @@
       "para 23(5)",
       "para 17(2)"
     ],
-    "why": "R1+R2+R7: only an electricity bill on file (address proof, not an OVD); no PAN or Form 60; the customer refused to give documents"
+    "why": "R1+R2+R7: only an electricity bill on file (address proof, not an OVD); no PAN or Form 60; the customer refused to give documents",
+    "tags": []
   },
   {
     "id": "case-27",
@@ -592,7 +662,10 @@
     ],
     "expected_decision": "escalate",
     "expected_citations": [],
-    "why": "R8: born 14-05-2012, so 14 years old on 30-10-2026; a minor cannot be a borrower (Form 60 instead of PAN is fine)"
+    "why": "R8: born 14-05-2012, so 14 years old on 30-10-2026; a minor cannot be a borrower (Form 60 instead of PAN is fine)",
+    "tags": [
+      "unlabelled"
+    ]
   },
   {
     "id": "case-28",
@@ -614,7 +687,8 @@
     ],
     "expected_decision": "escalate",
     "expected_citations": [],
-    "why": "R8: born 22-03-2013, so 13 years old on 30-10-2026; a minor cannot be a borrower"
+    "why": "R8: born 22-03-2013, so 13 years old on 30-10-2026; a minor cannot be a borrower",
+    "tags": []
   },
   {
     "id": "case-29",
@@ -637,17 +711,18 @@
       "para 42(1)",
       "para 17(1)"
     ],
-    "why": "R4+R6: high-risk file last updated 09-09-2022, the 2-year limit passed on 09-09-2024; and 'Demo User' is a fictitious name"
+    "why": "R4+R6: high-risk file last updated 09-09-2022, the 2-year limit passed on 09-09-2024; and 'Demo User' is a fictitious name",
+    "tags": []
   },
   {
     "id": "case-30",
-    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10030\nRisk category: Medium\nLast KYC date: 14-04-2023\n\n[Document 1: Aadhaar card]\nGovernment of India\nUnique Identification Authority of India\nBhavana Reddy\nDOB: 30/04/1990\nFEMALE\n9999 3344 5566\nAddress: 15 Dwaraka Nagar, Visakhapatnam, Andhra Pradesh\n530016\n\n[Document 2: PAN card]\nINCOME TAX DEPARTMENT\nPermanent Account Number Card\nYKAPR2277M\nBHAVANA RAO\n30/04/1990\n",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10030\nRisk category: Medium\nLast KYC date: 14-04-2023\n\n[Document 1: Aadhaar card]\nGovernment of India\nUnique Identification Authority of India\nBhavana Reddy\nDOB: 30/04/1990\nFEMALE\n9999 3344 5565\nAddress: 15 Dwaraka Nagar, Visakhapatnam, Andhra Pradesh\n530016\n\n[Document 2: PAN card]\nINCOME TAX DEPARTMENT\nPermanent Account Number Card\nYKAPR2277M\nBHAVANA RAO\n30/04/1990\n",
     "expected_fields": {
       "name": "BHAVANA REDDY",
       "dob": "30-04-1990",
       "pan": "YKAPR2277M",
       "form60": false,
-      "aadhaar": "9999-3344-5566",
+      "aadhaar": "9999-3344-5565",
       "address": "15 Dwaraka Nagar, Visakhapatnam, Andhra Pradesh",
       "pincode": "530016",
       "doc_type": "aadhaar",
@@ -662,6 +737,10 @@
       "para 23 Explanation 1",
       "para 17(2)"
     ],
-    "why": "R3+R7: Aadhaar number visible in full; and the Aadhaar card says Bhavana Reddy but the PAN card says Bhavana Rao"
+    "why": "R3+R7: Aadhaar number visible in full; and the Aadhaar card says Bhavana Reddy but the PAN card says Bhavana Rao",
+    "tags": [
+      "unlabelled",
+      "unmasked_aadhaar"
+    ]
   }
 ]

@@ -13,8 +13,10 @@ from evals.run_evals import (
     load_cases,
     score_citations,
     score_decision,
+    score_each_field,
     score_fields,
     score_validate,
+    score_validate_on,
     summarise,
 )
 
@@ -23,6 +25,8 @@ CASE_IDS = [case["id"] for case in CASES]
 
 CASE_KEYS = {"id", "raw_document", "expected_fields", "expected_errors",
              "expected_decision", "expected_citations", "why"}
+OPTIONAL_KEYS = {"tags"}
+ALLOWED_TAGS = {"unlabelled", "ocr_noise", "no_titles", "unmasked_aadhaar"}
 FIELD_KEYS = {"name", "dob", "pan", "form60", "aadhaar", "address", "pincode",
               "doc_type", "risk_category", "last_kyc_date"}
 SEVERITY = {"approve": 0, "re_kyc": 1, "escalate": 2}
@@ -80,6 +84,12 @@ def test_score_validate_runs_the_real_validate_node() -> None:
     fields = {"pan": "bad", "aadhaar": None, "pincode": "560001"}
     assert score_validate(fields, ["PAN format invalid"]) == (1, 1)
     assert score_validate(fields, []) == (0, 1)
+    assert score_validate_on({"pan": "ABCPE1234F"}, []) == (1, 1)
+
+
+def test_score_each_field_scores_only_non_null_expected_fields() -> None:
+    expected = {"pan": "ABCPE1234F", "dob": None, "pincode": "560001"}
+    assert score_each_field(expected, {"pan": "ABCPE1234F"}) == {"pan": (1, 1), "pincode": (0, 1)}
 
 
 def test_drop_nulls() -> None:
@@ -88,8 +98,12 @@ def test_drop_nulls() -> None:
 
 def test_summarise_two_rows() -> None:
     rows = [
-        {"decision": (1, 1), "citations": (1, 2), "fields": (3, 4), "validate": (1, 1)},
-        {"decision": (0, 1), "citations": (0, 0), "fields": (0, 2), "validate": (0, 1)},
+        {"decision": (1, 1), "citations": (1, 2), "fields": (3, 4), "fields_regex": (2, 4), "validate": (1, 1),
+         "validate_extracted": (1, 1), "tags": ["unlabelled"],
+         "each_field": {"name": (1, 1), "pan": (1, 1)}, "each_field_regex": {"name": (0, 1), "pan": (1, 1)}},
+        {"decision": (0, 1), "citations": (0, 0), "fields": (0, 2), "fields_regex": (0, 2), "validate": (0, 1),
+         "validate_extracted": (0, 1), "tags": [],
+         "each_field": {"name": (0, 1)}, "each_field_regex": {"name": (0, 1)}},
     ]
     summary = summarise(rows)
     assert summary["cases"] == 2
@@ -97,7 +111,13 @@ def test_summarise_two_rows() -> None:
     assert summary["citation_hit_rate"] == 0.5  # only the first row has expected citations
     assert summary["citation_cases"] == 1
     assert summary["extraction_accuracy"] == 0.5  # 3 of 6 fields
+    assert summary["extraction_regex_accuracy"] == 2 / 6
     assert summary["validate_accuracy"] == 0.5
+    assert summary["validate_extracted_accuracy"] == 0.5
+    assert summary["labelled_cases"] == 1 and summary["unlabelled_cases"] == 1
+    assert summary["per_field"]["name"]["model"] == {"all": (1, 2), "labelled": (0, 1), "unlabelled": (1, 1)}
+    assert summary["per_field"]["name"]["regex"]["all"] == (0, 2)
+    assert summary["per_field"]["pan"]["model"]["unlabelled"] == (1, 1)
 
 
 def test_summarise_empty_is_all_zero() -> None:
@@ -140,10 +160,18 @@ def test_all_six_ovd_types_and_the_special_files_are_covered() -> None:
 
 # --- every case on its own ----------------------------------------------------
 
+def test_tags_split_the_cases_without_hardcoding_ids() -> None:
+    unlabelled = [case["id"] for case in CASES if "unlabelled" in case.get("tags", [])]
+    assert 3 <= len(unlabelled) <= len(CASES) - 3
+    assert any("ocr_noise" in case.get("tags", []) for case in CASES)
+
+
 @pytest.mark.parametrize("case", CASES, ids=CASE_IDS)
-def test_case_has_exactly_the_required_keys(case: dict) -> None:
-    assert set(case) == CASE_KEYS
+def test_case_has_the_required_keys_and_known_tags(case: dict) -> None:
+    assert CASE_KEYS <= set(case) <= CASE_KEYS | OPTIONAL_KEYS
     assert set(case["expected_fields"]) == FIELD_KEYS
+    tags = case.get("tags", [])
+    assert isinstance(tags, list) and set(tags) <= ALLOWED_TAGS and len(tags) == len(set(tags))
 
 
 @pytest.mark.parametrize("case", CASES, ids=CASE_IDS)

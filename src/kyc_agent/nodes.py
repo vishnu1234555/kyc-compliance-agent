@@ -1,12 +1,16 @@
 import logging
 from collections.abc import Callable
+from typing import Any
 
+from kyc_agent.extraction import extract_fields
+from kyc_agent.pii_model import default_reader
 from kyc_agent.state import KYCState
 from kyc_agent.validators import (
     is_valid_aadhaar_masked,
     is_valid_dob,
     is_valid_pan,
     is_valid_pincode,
+    mask_aadhaar,
 )
 
 logger = logging.getLogger(__name__)
@@ -21,8 +25,29 @@ _CHECKS: dict[str, tuple[Callable[[str], bool], str]] = {
 
 
 def extract(state: KYCState) -> KYCState:
-    logger.info("extract: %d chars of raw document", len(state["raw_document"]))
-    return state
+    reader = default_reader()
+    result = extract_fields(state["raw_document"], reader)
+    logger.info("extract: %d chars, reader %s, fields %s", len(state["raw_document"]), reader.name, sorted(result.fields))
+    entry = {
+        "node": "extract",
+        "reader": reader.name,
+        "customer_id": result.stats.get("customer_id"),
+        "documents": [document["kind"] for document in result.documents],
+        "fields": sorted(result.fields),
+        "candidates": {key: result.stats[key] for key in ("regex_candidates", "model_candidates", "kept", "rejected")},
+    }
+    return {
+        **state,
+        "extracted_fields": result.fields,
+        "documents": result.documents,
+        "audit_log": [*state["audit_log"], entry],
+    }
+
+
+def _masked(fields: dict[str, Any]) -> dict[str, Any]:
+    if "aadhaar" in fields:
+        return {**fields, "aadhaar": mask_aadhaar(str(fields["aadhaar"]))}
+    return fields
 
 
 def validate(state: KYCState) -> KYCState:
@@ -32,11 +57,18 @@ def validate(state: KYCState) -> KYCState:
         for name, (check, message) in _CHECKS.items()
         if name in fields and not check(str(fields[name]))
     ]
+    # From here on the state keeps only the masked Aadhaar (RBI para 23 Explanation 1); the
+    # error message above is the record that the file showed it in full.
+    masked_fields = _masked(fields)
+    masked_documents = [_masked(document) for document in state.get("documents", [])]
+    aadhaar_masked = masked_fields != fields or masked_documents != state.get("documents", [])
     logger.info("validate: %d errors across %d fields", len(errors), len(fields))
     return {
         **state,
+        "extracted_fields": masked_fields,
+        "documents": masked_documents,
         "validation_errors": errors,
-        "audit_log": [*state["audit_log"], {"node": "validate", "errors": len(errors)}],
+        "audit_log": [*state["audit_log"], {"node": "validate", "errors": len(errors), "aadhaar_masked": aadhaar_masked}],
     }
 
 
