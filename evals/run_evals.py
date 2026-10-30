@@ -16,11 +16,12 @@ from pathlib import Path
 from typing import Any
 
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.types import Command
 
 from kyc_agent import nodes
 from kyc_agent.config import get_settings
 from kyc_agent.extraction import extract_fields
-from kyc_agent.graph import build_graph
+from kyc_agent.graph import build_graph, run_config
 from kyc_agent.nodes import validate
 from kyc_agent.pii_model import NullReader
 from kyc_agent.state import KYCState
@@ -109,15 +110,31 @@ def select_cases(cases: list[dict[str, Any]], wanted: str) -> list[dict[str, Any
     return [case for case in cases if case["id"] in ids] if ids else cases
 
 
+AUTO_REVIEW = {"reviewer": "eval-auto", "action": "confirm", "auto": True}
+
+
 def run_graph(graph: CompiledStateGraph, raw_document: str, config: dict[str, Any] | None = None) -> tuple[dict[str, Any], KYCState]:
-    """(extract's own output, before validate masks it; the final state)."""
+    """(extract's own output, before validate masks it; the final state).
+
+    There is no human in an eval run: when the graph pauses at human_review, it is resumed at
+    once with a confirm from "eval-auto", and the human_review audit entry says so (auto: True).
+    """
+    config = {**run_config(), **(config or {})}
     extracted: dict[str, Any] = {}
     final: KYCState | None = None
-    for mode, chunk in graph.stream(fresh_state(raw_document), config=config, stream_mode=["updates", "values"]):
-        if mode == "updates" and "extract" in chunk:
-            extracted = chunk["extract"].get("extracted_fields", {})
-        elif mode == "values":
-            final = chunk
+    graph_input: Any = fresh_state(raw_document)
+    for _ in range(2):  # at most one pause per file
+        interrupted = False
+        for mode, chunk in graph.stream(graph_input, config=config, stream_mode=["updates", "values"]):
+            if mode == "updates" and "extract" in chunk:
+                extracted = chunk["extract"].get("extracted_fields", {})
+            elif mode == "updates" and "__interrupt__" in chunk:
+                interrupted = True
+            elif mode == "values":
+                final = chunk
+        if not interrupted:
+            break
+        graph_input = Command(resume=AUTO_REVIEW)
     if final is None:
         raise RuntimeError("the graph produced no state")
     return extracted, final
@@ -150,6 +167,7 @@ def run_case(graph: CompiledStateGraph, case: dict[str, Any], gold_fields: bool 
         "llm_error": decide_entry.get("llm_error", ""),
         "tool_calls": len([call for call in decide_entry.get("tool_calls", []) if call.get("tool") != "submit_verdict"]),
         "llm_calls": decide_entry.get("llm_calls", 0),
+        "auto_reviewed": any(entry.get("node") == "human_review" and entry.get("auto") for entry in final["audit_log"]),
         "citations": score_citations(case["expected_citations"], final["rbi_citations"]),
         "fields": score_fields(case["expected_fields"], extracted),
         "fields_regex": score_fields(case["expected_fields"], regex_only),
@@ -184,6 +202,7 @@ def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
     llm_errors = 0
     tool_calls = 0
     llm_calls = 0
+    auto_reviewed = 0
     citation_rates: list[float] = []
     fields: Score = (0, 0)
     fields_regex: Score = (0, 0)
@@ -196,6 +215,7 @@ def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
         llm_errors += 1 if row.get("llm_error") else 0
         tool_calls += row.get("tool_calls", 0)
         llm_calls += row.get("llm_calls", 0)
+        auto_reviewed += 1 if row.get("auto_reviewed") else 0
         hits, total = row["citations"]
         if total > 0:
             citation_rates.append(hits / total)
@@ -214,6 +234,7 @@ def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "llm_errors": llm_errors,
         "tool_calls": tool_calls,
         "llm_calls": llm_calls,
+        "auto_reviewed": auto_reviewed,
         "citation_hit_rate": safe_divide(sum(citation_rates), len(citation_rates)),
         "citation_cases": len(citation_rates),
         "extraction_accuracy": safe_divide(*fields),
@@ -255,6 +276,8 @@ def print_scorecard(summary: dict[str, Any], rows: list[dict[str, Any]], reader:
         print(f"  LLM fallbacks           {', '.join(fallbacks)}")
     if summary.get("tool_calls"):
         print(f"  agent tool calls        {summary['tool_calls']} in total, {summary['tool_calls'] / n:.1f} per case; {summary['llm_calls']} LLM calls")
+    if "auto_reviewed" in summary:
+        print(f"  human_review            paused and auto-resumed by eval-auto in {summary['auto_reviewed']}/{n} cases (no human in an eval run)")
     print(f"  citation hit rate       {summary['citation_hit_rate']:.4f} (mean over {summary['citation_cases']} cases with expected citations)")
     print(f"  extraction accuracy     {summary['extraction_hits']}/{summary['extraction_total']} = {summary['extraction_accuracy']:.4f} (regex + PII model, extract's output before masking)")
     print(f"  extraction, regex only  {summary['extraction_regex_hits']}/{summary['extraction_regex_total']} = {summary['extraction_regex_accuracy']:.4f}")

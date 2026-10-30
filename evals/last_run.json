@@ -9,6 +9,7 @@
   "llm_errors": 0,
   "tool_calls": 0,
   "llm_calls": 0,
+  "auto_reviewed": 19,
   "citation_hit_rate": 0.8529411764705882,
   "citation_cases": 17,
   "extraction_accuracy": 0.989247311827957,

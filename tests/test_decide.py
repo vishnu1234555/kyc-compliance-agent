@@ -5,7 +5,7 @@ import pytest
 
 from kyc_agent import nodes
 from kyc_agent.decide import Verdict, build_messages, keep_retrieved_citations, llm_decide, rules_decide
-from kyc_agent.graph import build_graph
+from kyc_agent.graph import build_graph, run_config
 
 AS_OF = date(2026, 10, 30)
 RETRIEVED = [
@@ -118,10 +118,10 @@ def test_approve_skips_human_review_and_others_do_not(monkeypatch: pytest.Monkey
     monkeypatch.setattr(nodes, "human_review", spy)
     monkeypatch.setenv("DECIDE_MODE", "rules")
     clean = "KYC RECORD\nCustomer ID: X\nRisk category: Medium\nLast KYC date: 14-02-2022\n\n[Document 1: Passport]\nName: A B\nDate of birth: 01-01-1990\nPIN: 560001\n\n[Document 2: PAN card]\nPermanent Account Number: ABCPE1234F\n"
-    final = build_graph().invoke(_state({}) | {"raw_document": clean})
+    final = build_graph().invoke(_state({}) | {"raw_document": clean}, config=run_config())
     assert final["decision"] == "approve" and visited == []
     bill = clean.replace("[Document 1: Passport]", "[Document 1: Electricity bill]")
-    final = build_graph().invoke(_state({}) | {"raw_document": bill})
+    final = build_graph().invoke(_state({}) | {"raw_document": bill}, config=run_config())
     assert final["decision"] == "re_kyc" and visited == ["human_review"]
 
 

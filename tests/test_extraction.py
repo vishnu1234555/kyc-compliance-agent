@@ -1,6 +1,6 @@
 from kyc_agent import nodes
 from kyc_agent.extraction import extract_fields, normalise_address, normalise_date
-from kyc_agent.graph import build_graph
+from kyc_agent.graph import build_graph, run_config
 from kyc_agent.pii_model import FakeReader, NullReader, parse_model_output
 from kyc_agent.state import KYCState
 
@@ -102,7 +102,7 @@ def test_extract_node_fills_state_and_audits(monkeypatch) -> None:
 
 def test_graph_masks_the_aadhaar_right_after_validate() -> None:
     state: KYCState = {"raw_document": AADHAAR_FILE, "extracted_fields": {}, "documents": [], "validation_errors": [], "findings": [], "retrieved_rules": [], "rbi_citations": [], "decision": "", "reason": "", "rules_verdict": {}, "audit_log": []}
-    final = build_graph().invoke(state)
+    final = build_graph().invoke(state, config=run_config())
     assert final["validation_errors"] == ["Aadhaar must be masked as XXXX-XXXX-1234"]
     assert final["extracted_fields"]["aadhaar"] == "XXXX-XXXX-7782"
     assert final["documents"][0]["aadhaar"] == "XXXX-XXXX-7782"

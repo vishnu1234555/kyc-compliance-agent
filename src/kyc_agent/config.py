@@ -29,6 +29,8 @@ class Settings:
     decide_mode: str
     gemini_model: str
     gemini_thinking_budget: int | None
+    # human_review: SQLite file for checkpoints so a reviewer can resume later; empty = in memory
+    checkpoint_db: str
 
 
 def get_settings() -> Settings:
@@ -45,6 +47,7 @@ def get_settings() -> Settings:
         decide_mode=os.getenv("DECIDE_MODE", "llm"),
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"),
         gemini_thinking_budget=_optional_int(os.getenv("GEMINI_THINKING_BUDGET", "0")),
+        checkpoint_db=os.getenv("CHECKPOINT_DB", ""),
     )
 
 

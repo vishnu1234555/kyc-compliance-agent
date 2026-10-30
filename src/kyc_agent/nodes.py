@@ -2,6 +2,8 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+from langgraph.types import interrupt
+
 from kyc_agent.agent import agent_decide
 from kyc_agent.config import get_settings
 from kyc_agent.decide import Decision, llm_decide, rules_decide
@@ -153,5 +155,28 @@ def decide(state: KYCState) -> KYCState:
 
 
 def human_review(state: KYCState) -> KYCState:
-    logger.info("human_review: decision=%r", state["decision"])
-    return state
+    """Pause for a reviewer (LangGraph interrupt). The graph stops here until it is resumed with
+    Command(resume={...}); the checkpointer keeps the state in between.
+
+    The resume value is a dict: {"reviewer": str, "action": "confirm" | "override", "decision":
+    optional new decision, "note": optional text, "auto": True when the evals resumed it}.
+    """
+    review: dict[str, Any] = interrupt({
+        "customer_id": next((entry.get("customer_id") for entry in state["audit_log"] if entry.get("node") == "extract"), None),
+        "decision": state["decision"],
+        "reason": state.get("reason", ""),
+        "citations": state["rbi_citations"],
+        "validation_errors": state["validation_errors"],
+        "question": "Confirm the decision, or override it (approve / re_kyc / escalate) with a note.",
+    }) or {}
+    action = str(review.get("action", "confirm"))
+    decision = state["decision"]
+    if action == "override" and review.get("decision") in ("approve", "re_kyc", "escalate"):
+        decision = review["decision"]
+    reason = state.get("reason", "")
+    if review.get("note"):
+        reason = f"{reason} Reviewer: {review['note']}".strip()
+    logger.info("human_review: %s by %s -> %s", action, review.get("reviewer", "unknown"), decision)
+    entry = {"node": "human_review", "reviewer": review.get("reviewer", "unknown"), "action": action,
+             "decision_before": state["decision"], "decision": decision, "auto": bool(review.get("auto", False))}
+    return {**state, "decision": decision, "reason": reason, "audit_log": [*state["audit_log"], entry]}

@@ -10,7 +10,7 @@ is not `done`.
 | 3 `retrieve_rules` | done | PyPDFLoader -> paragraph splitter (citation metadata) -> Gemini embeddings -> Chroma; findings.py turns errors/fields into queries; all eight POLICY paragraph numbers verified against the official text |
 | 4 `decide` | done | rules_decide baseline (R1-R8 except R6) + Gemini Flash-Lite structured verdict, citations filtered to retrieved paragraphs, approve skips human_review; LLM evals capped by the key's free tier (20 requests/day/model) |
 | 4b agentic `decide` | done (code + 3-case live check); 30-case numbers blocked by quota | tool loop: search_rbi_rules, check_kyc_due, compare_across_documents, submit_verdict; max 5 investigation calls; every call in the audit entry |
-| 5 `human_review` | pending | |
+| 5 `human_review` | done | LangGraph interrupt() + checkpointer (memory, or SQLite via CHECKPOINT_DB); evals auto-resume as "eval-auto" and record it |
 | 6 LangSmith | pending | |
 | Docs | pending | README, docs/WALKTHROUGH.md, CLAUDE.md roadmap |
 
@@ -170,3 +170,23 @@ any overlap against a guessed candidate.
   `DECIDE_MODE=llm .venv/bin/python evals/run_evals.py`,
   `DECIDE_MODE=agent .venv/bin/python evals/run_evals.py`,
   `DECIDE_MODE=agent EVAL_GOLD_FIELDS=1 .venv/bin/python evals/run_evals.py`.
+
+## Item 5: human_review (done)
+
+- `nodes.human_review` calls `interrupt(payload)` with the customer id, decision, reason,
+  citations and validation errors. The graph stops; `graph.invoke(Command(resume={...}),
+  config)` continues it. The resume dict carries `reviewer`, `action` (confirm / override),
+  an optional new `decision` and `note`; the node writes an audit entry with the decision
+  before and after and `auto` (True when the evals resumed it).
+- `build_graph()` always compiles a checkpointer: `MemorySaver` by default, `SqliteSaver` when
+  `CHECKPOINT_DB` names a file (a reviewer can resume after a restart; tested with a second
+  graph object on the same database). `run_config(thread_id)` gives every invoke the thread id
+  the checkpointer needs; one thread per KYC file.
+- Eval mode: `run_graph` streams, sees the `__interrupt__` update, and resumes with
+  `{"reviewer": "eval-auto", "action": "confirm", "auto": True}`. The scorecard prints how many
+  cases paused ("paused and auto-resumed by eval-auto in 19/30 cases"); approve never pauses.
+- `main.py` shows the pause payload and resumes with a demo confirm.
+- Known limit, written up for the README: with a persistent checkpointer the snapshot taken
+  after `extract` holds the Aadhaar number as printed (validate masks it one step later). Keep
+  the in-memory checkpointer, or encrypt the SQLite file / use LangGraph's EncryptedSerializer,
+  before running this with real data.
