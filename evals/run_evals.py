@@ -25,6 +25,7 @@ from kyc_agent.graph import build_graph, run_config
 from kyc_agent.nodes import validate
 from kyc_agent.pii_model import NullReader
 from kyc_agent.state import KYCState
+from kyc_agent.tracing import langsmith_client
 
 logger = logging.getLogger("evals")
 
@@ -316,6 +317,9 @@ def main() -> None:
     summary = summarise(rows)
     print_scorecard(summary, rows, reader, decider)
     LAST_RUN_PATH.write_text(json.dumps({"pii_model": reader, "decide": decider, **summary}, indent=2) + "\n", encoding="utf-8")
+    if langsmith_client() is not None:
+        langsmith_client().flush()
+        print(f"  traces: LangSmith project {settings.langsmith_project} (12-digit numbers masked by the anonymizer)")
 
 
 if __name__ == "__main__":

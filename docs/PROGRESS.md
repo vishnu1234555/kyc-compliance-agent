@@ -11,7 +11,7 @@ is not `done`.
 | 4 `decide` | done | rules_decide baseline (R1-R8 except R6) + Gemini Flash-Lite structured verdict, citations filtered to retrieved paragraphs, approve skips human_review; LLM evals capped by the key's free tier (20 requests/day/model) |
 | 4b agentic `decide` | done (code + 3-case live check); 30-case numbers blocked by quota | tool loop: search_rbi_rules, check_kyc_due, compare_across_documents, submit_verdict; max 5 investigation calls; every call in the audit entry |
 | 5 `human_review` | done | LangGraph interrupt() + checkpointer (memory, or SQLite via CHECKPOINT_DB); evals auto-resume as "eval-auto" and record it |
-| 6 LangSmith | pending | |
+| 6 LangSmith | done | tracer attached through run_config with the 12-digit anonymizer; dataset `kyc-compliance-agent-cases` (masked documents) uploaded; experiment `kyc-rules-a3974733` run against it |
 | Docs | pending | README, docs/WALKTHROUGH.md, CLAUDE.md roadmap |
 
 ## Blocked in this session (not faked in code)
@@ -190,3 +190,23 @@ any overlap against a guessed candidate.
   after `extract` holds the Aadhaar number as printed (validate masks it one step later). Keep
   the in-memory checkpointer, or encrypt the SQLite file / use LangGraph's EncryptedSerializer,
   before running this with real data.
+
+## Item 6: LangSmith (done)
+
+- `tracing.py`: when `LANGSMITH_API_KEY` is set, `run_config()` attaches a `LangChainTracer`
+  built on a `Client(anonymizer=...)` whose replacer rewrites every 12-digit run (with or
+  without spaces/hyphens) to `XXXX-XXXX-<last four>` in traced inputs, outputs and errors. The
+  tracer is attached explicitly, never through `LANGSMITH_TRACING=true`, because that switch
+  would start a second, un-anonymised tracer. Checked after the run: the 100 most recent
+  traced runs and the extract-node runs contain no 12-digit number; the R3 cases' numbers
+  appear as XXXX-XXXX-7782 etc.
+- `evals/langsmith_dataset.py`: uploads `evals/cases.json` as dataset `kyc-compliance-agent-cases`
+  and runs `langsmith.evaluate` against it with the same three per-case scores as the local
+  scorecard. SAFETY: the uploaded documents are masked, so the dataset's labels are the policy
+  applied to the masked file (R3 cannot fire on it): cases 14, 20, 21, 30 carry a different
+  expected decision there, with the original kept as `original_decision`. Verified: no 12-digit
+  number in any example. Experiment `kyc-rules-a3974733` (DECIDE_MODE=rules): decision_match
+  0.9000 over 30, citation_hit_rate 0.8333 over the 15 masked-label cases with citations,
+  extraction_accuracy 0.9896.
+- Unit tests never reach LangSmith (the key is blanked in a fixture); run_evals flushes the
+  client at the end and prints the project name.

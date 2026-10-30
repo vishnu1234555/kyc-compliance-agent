@@ -18,6 +18,7 @@ from langgraph.graph.state import CompiledStateGraph
 from kyc_agent import nodes
 from kyc_agent.config import get_settings
 from kyc_agent.state import KYCState
+from kyc_agent.tracing import tracing_callbacks
 
 logger = logging.getLogger(__name__)
 
@@ -56,5 +57,10 @@ def route_after_decide(state: KYCState) -> str:
 
 
 def run_config(thread_id: str | None = None) -> dict[str, Any]:
-    """The config every invoke/stream needs: a thread id for the checkpointer (one per KYC file)."""
-    return {"configurable": {"thread_id": thread_id or str(uuid.uuid4())}}
+    """The config every invoke/stream needs: a thread id for the checkpointer (one per KYC file)
+    and, when LANGSMITH_API_KEY is set, the LangSmith tracer that masks 12-digit numbers."""
+    config: dict[str, Any] = {"configurable": {"thread_id": thread_id or str(uuid.uuid4())}}
+    callbacks = tracing_callbacks()
+    if callbacks:
+        config["callbacks"] = callbacks
+    return config

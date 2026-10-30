@@ -26,6 +26,17 @@ def no_model(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def no_tracing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unit tests never talk to LangSmith."""
+    from kyc_agent import tracing
+
+    monkeypatch.setenv("LANGSMITH_API_KEY", "")
+    tracing.langsmith_client.cache_clear()
+    yield
+    tracing.langsmith_client.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def no_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     """Unit tests run the plain-code decide; a test that wants the LLM path sets DECIDE_MODE=llm and fakes the model."""
     monkeypatch.setenv("DECIDE_MODE", "rules")
