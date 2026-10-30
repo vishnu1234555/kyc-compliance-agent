@@ -12,7 +12,7 @@ LangGraph agent that reads a KYC document, validates it against RBI KYC Master D
 - Keep PRs small: one node per PR.
 
 ## Roadmap (do in order, one PR each)
-1. `extract`: Gemini (GOOGLE_API_KEY) structured-output call -> `extracted_fields` (name, dob, pan, aadhaar_last4, address, doc_type). Pydantic schema, no free-form JSON parsing.
+1. `extract`: Gemini (GOOGLE_API_KEY) structured-output call -> `extracted_fields` (name, dob, pan, aadhaar (masked XXXX-XXXX-1234), address, pincode, doc_type). Pydantic schema, no free-form JSON parsing.
 2. `validate`: deterministic checks only (PAN regex, DOB sanity, address present, OVD type allowed). Populate `validation_errors`. No LLM here.
 3. `retrieve_rules`: chunk the RBI KYC Master Direction PDF into a local vector store (Chroma), retrieve by `validation_errors`, fill `rbi_citations` with section numbers.
 4. `decide`: LLM given fields + errors + citations -> `decision`. Add conditional edge: `approve` skips `human_review`.
