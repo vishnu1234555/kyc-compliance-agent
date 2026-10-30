@@ -50,6 +50,8 @@ def fresh_state(raw_document: str) -> KYCState:
         "retrieved_rules": [],
         "rbi_citations": [],
         "decision": "",
+        "reason": "",
+        "rules_verdict": {},
         "audit_log": [],
     }
 
@@ -118,12 +120,16 @@ def run_case(graph: CompiledStateGraph, case: dict[str, Any]) -> dict[str, Any]:
     extracted, final = run_graph(graph, case["raw_document"])
     regex_only = extract_fields(case["raw_document"], NullReader()).fields
     logger.info("%s: decision expected %r, got %r", case["id"], case["expected_decision"], final["decision"])
+    baseline = final.get("rules_verdict", {}).get("decision", "")
+    decide_entry = next((entry for entry in final["audit_log"] if entry.get("node") == "decide"), {})
     return {
         "id": case["id"],
         "tags": case.get("tags", []),
         "expected_decision": case["expected_decision"],
         "got_decision": final["decision"],
         "decision": score_decision(case["expected_decision"], final["decision"]),
+        "decision_rules": score_decision(case["expected_decision"], baseline),
+        "llm_error": decide_entry.get("llm_error", ""),
         "citations": score_citations(case["expected_citations"], final["rbi_citations"]),
         "fields": score_fields(case["expected_fields"], extracted),
         "fields_regex": score_fields(case["expected_fields"], regex_only),
@@ -154,6 +160,8 @@ def per_field_table(rows: list[dict[str, Any]]) -> dict[str, dict[str, dict[str,
 
 def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
     decision_hits = 0
+    rules_hits = 0
+    llm_errors = 0
     citation_rates: list[float] = []
     fields: Score = (0, 0)
     fields_regex: Score = (0, 0)
@@ -162,6 +170,8 @@ def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
     unlabelled = 0
     for row in rows:
         decision_hits += row["decision"][0]
+        rules_hits += row.get("decision_rules", (0, 1))[0]
+        llm_errors += 1 if row.get("llm_error") else 0
         hits, total = row["citations"]
         if total > 0:
             citation_rates.append(hits / total)
@@ -175,6 +185,9 @@ def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "cases": len(rows),
         "decision_accuracy": safe_divide(decision_hits, len(rows)),
         "decision_hits": decision_hits,
+        "decision_rules_accuracy": safe_divide(rules_hits, len(rows)),
+        "decision_rules_hits": rules_hits,
+        "llm_errors": llm_errors,
         "citation_hit_rate": safe_divide(sum(citation_rates), len(citation_rates)),
         "citation_cases": len(citation_rates),
         "extraction_accuracy": safe_divide(*fields),
@@ -205,10 +218,15 @@ def _ratio(score: Score) -> str:
     return f"{score[0]}/{score[1]}"
 
 
-def print_scorecard(summary: dict[str, Any], rows: list[dict[str, Any]], reader: str) -> None:
+def print_scorecard(summary: dict[str, Any], rows: list[dict[str, Any]], reader: str, decider: str) -> None:
     n = summary["cases"]
-    print(f"KYC EVALS - {n} cases (PII model: {reader})")
-    print(f"  decision accuracy       {summary['decision_hits']}/{n} = {summary['decision_accuracy']:.4f}")
+    print(f"KYC EVALS - {n} cases (PII model: {reader}; decide: {decider})")
+    errors = f", {summary['llm_errors']} LLM errors fell back to the rules" if summary.get("llm_errors") else ""
+    print(f"  decision accuracy       {summary['decision_hits']}/{n} = {summary['decision_accuracy']:.4f} (decide node{errors})")
+    print(f"  decision, rules only    {summary['decision_rules_hits']}/{n} = {summary['decision_rules_accuracy']:.4f} (plain-code baseline, R1-R8 except R6)")
+    fallbacks = [row["id"] for row in rows if row.get("llm_error")]
+    if fallbacks:
+        print(f"  LLM fallbacks           {', '.join(fallbacks)}")
     print(f"  citation hit rate       {summary['citation_hit_rate']:.4f} (mean over {summary['citation_cases']} cases with expected citations)")
     print(f"  extraction accuracy     {summary['extraction_hits']}/{summary['extraction_total']} = {summary['extraction_accuracy']:.4f} (regex + PII model, extract's output before masking)")
     print(f"  extraction, regex only  {summary['extraction_regex_hits']}/{summary['extraction_regex_total']} = {summary['extraction_regex_accuracy']:.4f}")
@@ -237,12 +255,13 @@ def main() -> None:
     logging.basicConfig(level=os.environ.get("LOG_LEVEL", "WARNING"), format="%(levelname)s %(name)s: %(message)s")
     settings = get_settings()
     reader = f"{settings.pii_model} @ {settings.pii_threshold:.2f}"
+    decider = settings.decide_mode if settings.decide_mode == "rules" else f"{settings.decide_mode} {settings.gemini_model}"
     cases = load_cases()
     graph = build_graph()
     rows = [run_case(graph, case) for case in cases]
     summary = summarise(rows)
-    print_scorecard(summary, rows, reader)
-    LAST_RUN_PATH.write_text(json.dumps({"pii_model": reader, **summary}, indent=2) + "\n", encoding="utf-8")
+    print_scorecard(summary, rows, reader, decider)
+    LAST_RUN_PATH.write_text(json.dumps({"pii_model": reader, "decide": decider, **summary}, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

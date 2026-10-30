@@ -26,6 +26,17 @@ def no_model(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def no_llm(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unit tests run the plain-code decide; a test that wants the LLM path sets DECIDE_MODE=llm and fakes the model."""
+    monkeypatch.setenv("DECIDE_MODE", "rules")
+
+    def refuse() -> None:
+        raise AssertionError("a unit test tried to build the real Gemini model")
+
+    monkeypatch.setattr(nodes, "get_chat_model", refuse)
+
+
+@pytest.fixture(autouse=True)
 def fake_index(monkeypatch: pytest.MonkeyPatch) -> FakeIndex:
     index = FakeIndex(RBI_CHUNKS)
     monkeypatch.setattr(nodes, "default_index", lambda: index)

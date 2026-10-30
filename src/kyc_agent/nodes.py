@@ -3,8 +3,10 @@ from collections.abc import Callable
 from typing import Any
 
 from kyc_agent.config import get_settings
+from kyc_agent.decide import Decision, llm_decide, rules_decide
 from kyc_agent.extraction import extract_fields
 from kyc_agent.findings import build_findings
+from kyc_agent.llm import get_chat_model
 from kyc_agent.pii_model import default_reader
 from kyc_agent.rules_index import default_index
 from kyc_agent.state import KYCState
@@ -109,8 +111,33 @@ def retrieve_rules(state: KYCState) -> KYCState:
 
 
 def decide(state: KYCState) -> KYCState:
-    logger.info("decide: %d RBI citations", len(state["rbi_citations"]))
-    return state
+    """Rules baseline always; the LLM verdict on top unless DECIDE_MODE=rules. Falls back to the rules."""
+    settings = get_settings()
+    baseline = rules_decide(state)
+    entry: dict[str, Any] = {"node": "decide", "mode": settings.decide_mode, "rules_baseline": baseline.decision,
+                             "rules_fired": baseline.rules}
+    verdict = baseline
+    if settings.decide_mode == "llm":
+        entry["model"] = settings.gemini_model
+        try:
+            verdict = llm_decide(state, get_chat_model())
+            entry["dropped_citations"] = verdict.dropped_citations
+        except Exception as exc:  # the LLM is unreachable even after backoff: keep the file moving
+            logger.error("decide: LLM failed (%s); applying the rules baseline", exc)
+            entry["llm_error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+            verdict = Decision(baseline.decision, baseline.citations,
+                               f"LLM unavailable, rules baseline applied: {baseline.reason}", rules=baseline.rules,
+                               error=entry["llm_error"])
+    entry.update({"decision": verdict.decision, "citations": verdict.citations})
+    logger.info("decide: %s (rules baseline %s) citations %s", verdict.decision, baseline.decision, verdict.citations)
+    return {
+        **state,
+        "decision": verdict.decision,
+        "rbi_citations": verdict.citations,
+        "reason": verdict.reason,
+        "rules_verdict": baseline.as_dict(),
+        "audit_log": [*state["audit_log"], entry],
+    }
 
 
 def human_review(state: KYCState) -> KYCState:

@@ -17,6 +17,11 @@ def build_graph() -> CompiledStateGraph:
     builder.add_edge("extract", "validate")
     builder.add_edge("validate", "retrieve_rules")
     builder.add_edge("retrieve_rules", "decide")
-    builder.add_edge("decide", "human_review")
+    # approve goes straight out; re_kyc and escalate go to a human
+    builder.add_conditional_edges("decide", route_after_decide, {"human_review": "human_review", "end": END})
     builder.add_edge("human_review", END)
     return builder.compile()
+
+
+def route_after_decide(state: KYCState) -> str:
+    return "end" if state["decision"] == "approve" else "human_review"

@@ -36,6 +36,8 @@ def main() -> None:
         "retrieved_rules": [],
         "rbi_citations": [],
         "decision": "",
+        "reason": "",
+        "rules_verdict": {},
         "audit_log": [],
     }
     final = build_graph().invoke(initial)

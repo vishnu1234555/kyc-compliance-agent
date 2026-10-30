@@ -16,7 +16,7 @@ from kyc_agent.arbitration import Candidate
 from kyc_agent.documents import Block
 
 DATE = r"\d{1,2}[-/.]\d{1,2}[-/.]\d{4}"
-AADHAAR_ANY = r"X{4}[\s-]?X{4}[\s-]?\d{4}|\d{4}[\s-]?\d{4}[\s-]?\d{4}"
+AADHAAR_ANY = r"X{4}[ -]?X{4}[ -]?\d{4}|\d{4}[ -]?\d{4}[ -]?\d{4}"  # a number never spans a line break
 
 # label -> the words a document prints before the colon
 _LINE_LABELS: dict[str, str] = {

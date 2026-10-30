@@ -65,6 +65,8 @@ def test_validate_node_collects_errors_and_audits() -> None:
         "retrieved_rules": [],
         "rbi_citations": [],
         "decision": "",
+        "reason": "",
+        "rules_verdict": {},
         "audit_log": [],
     }
     out = validate(state)
@@ -83,6 +85,8 @@ def test_validate_node_masks_a_full_aadhaar_but_keeps_the_error() -> None:
         "retrieved_rules": [],
         "rbi_citations": [],
         "decision": "",
+        "reason": "",
+        "rules_verdict": {},
         "audit_log": [],
     }
     out = validate(state)

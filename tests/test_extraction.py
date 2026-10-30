@@ -91,7 +91,7 @@ def test_parse_model_output_handles_the_gliner2_shapes() -> None:
 
 def test_extract_node_fills_state_and_audits(monkeypatch) -> None:
     monkeypatch.setattr(nodes, "default_reader", lambda: FakeReader([("Person Name", "Vikram Bhosale", 0.99)]))
-    state: KYCState = {"raw_document": AADHAAR_FILE, "extracted_fields": {}, "documents": [], "validation_errors": [], "findings": [], "retrieved_rules": [], "rbi_citations": [], "decision": "", "audit_log": []}
+    state: KYCState = {"raw_document": AADHAAR_FILE, "extracted_fields": {}, "documents": [], "validation_errors": [], "findings": [], "retrieved_rules": [], "rbi_citations": [], "decision": "", "reason": "", "rules_verdict": {}, "audit_log": []}
     out = nodes.extract(state)
     assert out["extracted_fields"]["name"] == "VIKRAM BHOSALE"
     assert out["extracted_fields"]["aadhaar"] == "9999-4512-7782"
@@ -101,9 +101,15 @@ def test_extract_node_fills_state_and_audits(monkeypatch) -> None:
 
 
 def test_graph_masks_the_aadhaar_right_after_validate() -> None:
-    state: KYCState = {"raw_document": AADHAAR_FILE, "extracted_fields": {}, "documents": [], "validation_errors": [], "findings": [], "retrieved_rules": [], "rbi_citations": [], "decision": "", "audit_log": []}
+    state: KYCState = {"raw_document": AADHAAR_FILE, "extracted_fields": {}, "documents": [], "validation_errors": [], "findings": [], "retrieved_rules": [], "rbi_citations": [], "decision": "", "reason": "", "rules_verdict": {}, "audit_log": []}
     final = build_graph().invoke(state)
     assert final["validation_errors"] == ["Aadhaar must be masked as XXXX-XXXX-1234"]
     assert final["extracted_fields"]["aadhaar"] == "XXXX-XXXX-7782"
     assert final["documents"][0]["aadhaar"] == "XXXX-XXXX-7782"
     assert final["audit_log"][1] == {"node": "validate", "errors": 1, "aadhaar_masked": True}
+
+
+def test_a_date_line_above_the_aadhaar_does_not_swallow_it() -> None:
+    file = AADHAAR_FILE.replace("DOB: 06/06/1977\nMALE\n9999 4512 7782", "DOB: 06/06/1977\n9999 4512 7782")
+    out = extract_fields(file, NullReader())
+    assert out.fields["aadhaar"] == "9999-4512-7782" and out.fields["dob"] == "06-06-1977"

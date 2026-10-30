@@ -25,6 +25,10 @@ class Settings:
     chroma_dir: str
     embedding_model: str
     retrieval_k: int
+    # decide: "rules" (baseline only, no LLM) or "llm" (Gemini Flash, structured output)
+    decide_mode: str
+    gemini_model: str
+    gemini_thinking_budget: int | None
 
 
 def get_settings() -> Settings:
@@ -38,4 +42,12 @@ def get_settings() -> Settings:
         chroma_dir=os.getenv("CHROMA_DIR", str(DEFAULT_CHROMA_DIR)),
         embedding_model=os.getenv("EMBEDDING_MODEL", "gemini-embedding-001"),
         retrieval_k=int(os.getenv("RETRIEVAL_K", "3")),
+        decide_mode=os.getenv("DECIDE_MODE", "llm"),
+        gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"),
+        gemini_thinking_budget=_optional_int(os.getenv("GEMINI_THINKING_BUDGET", "0")),
     )
+
+
+def _optional_int(value: str) -> int | None:
+    """"0" -> 0 (thinking off), "" or "none" -> None (the model's default)."""
+    return None if value.strip().lower() in ("", "none") else int(value)

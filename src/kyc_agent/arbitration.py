@@ -83,11 +83,11 @@ def verhoeff_valid(digits: str) -> bool:
 # Per-label structure
 # --------------------------------------------------------------------------
 
-MASKED_AADHAAR = re.compile(r"X{4}[\s-]?X{4}[\s-]?\d{4}")
+MASKED_AADHAAR = re.compile(r"X{4}[ -]?X{4}[ -]?\d{4}")
 
 # Used both to find candidates in raw text and to validate model output.
 REGEX_PATTERNS: dict[str, str] = {
-    "Aadhaar Number": r"\b(?:X{4}[\s-]?X{4}[\s-]?\d{4}|[2-9]\d{3}[\s-]?\d{4}[\s-]?\d{4})\b",
+    "Aadhaar Number": r"\b(?:X{4}[ -]?X{4}[ -]?\d{4}|[2-9]\d{3}[ -]?\d{4}[ -]?\d{4})\b",
     "PAN Number": r"\b[A-Z]{5}\d{4}[A-Z]\b",
     "IFSC Code": r"\b[A-Z]{4}0[A-Z0-9]{6}\b",
     # A VPA handle is not an email address: the domain half carries no dot.

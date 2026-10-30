@@ -71,7 +71,7 @@ def test_fake_index_ranks_by_word_overlap() -> None:
 
 def _state(fields: dict, errors: list[str], documents: list[dict] | None = None) -> KYCState:
     return {"raw_document": "", "extracted_fields": fields, "documents": documents or [], "validation_errors": errors,
-            "findings": [], "retrieved_rules": [], "rbi_citations": [], "decision": "", "audit_log": []}
+            "findings": [], "retrieved_rules": [], "rbi_citations": [], "decision": "", "reason": "", "rules_verdict": {}, "audit_log": []}
 
 
 def test_retrieve_rules_node_cites_in_rule_order(fake_index: FakeIndex) -> None:
@@ -93,7 +93,7 @@ def test_retrieve_rules_node_with_nothing_wrong() -> None:
 
 
 def test_with_backoff_retries_rate_limits_only(monkeypatch: pytest.MonkeyPatch) -> None:
-    from kyc_agent import rules_index
+    from kyc_agent import backoff as rules_index
 
     waits: list[int] = []
     monkeypatch.setattr(rules_index.time, "sleep", waits.append)
@@ -106,6 +106,10 @@ def test_with_backoff_retries_rate_limits_only(monkeypatch: pytest.MonkeyPatch) 
         return "ok"
 
     assert rules_index.with_backoff(flaky, what="test") == "ok"
+    assert waits == [5, 15]
+    daily = RuntimeError("429 RESOURCE_EXHAUSTED quotaId GenerateRequestsPerDayPerProjectPerModel-FreeTier")
+    with pytest.raises(RuntimeError):  # a spent daily quota fails at once instead of waiting four minutes
+        rules_index.with_backoff(lambda: (_ for _ in ()).throw(daily), what="test")
     assert waits == [5, 15]
     with pytest.raises(ValueError):
         rules_index.with_backoff(lambda: (_ for _ in ()).throw(ValueError("bad input")), what="test")

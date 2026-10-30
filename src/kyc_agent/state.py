@@ -15,4 +15,6 @@ class KYCState(TypedDict):
     retrieved_rules: list[dict[str, Any]]
     rbi_citations: list[str]
     decision: Decision
+    reason: str  # one line from decide
+    rules_verdict: dict[str, Any]  # the plain-code baseline (decision, citations, reason, rules)
     audit_log: list[dict[str, Any]]

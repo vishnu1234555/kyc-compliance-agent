@@ -21,6 +21,7 @@ from typing import Any, Protocol
 
 from langchain_core.documents import Document
 
+from kyc_agent.backoff import with_backoff
 from kyc_agent.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -233,20 +234,6 @@ class ChromaIndex:
 # text counts as one request. 25 texts every 16 seconds stays under it.
 EMBED_BATCH = 25
 EMBED_PAUSE_SECONDS = 16
-BACKOFF_SECONDS = (5, 15, 30, 60, 60, 60)
-
-
-def with_backoff(call: Any, what: str) -> Any:
-    """Run `call`; on a rate limit or outage, wait and retry on a fixed schedule, then give up."""
-    for attempt, wait in enumerate(BACKOFF_SECONDS):
-        try:
-            return call()
-        except Exception as exc:  # the google client raises several types for 429/503
-            if not _is_transient(exc):
-                raise
-            logger.warning("%s: %s (attempt %d); retrying in %ds", what, type(exc).__name__, attempt + 1, wait)
-            time.sleep(wait)
-    return call()
 
 
 def add_in_batches(store: Any, chunks: list[Document], batch_size: int = EMBED_BATCH, pause: float = EMBED_PAUSE_SECONDS) -> None:
@@ -257,11 +244,6 @@ def add_in_batches(store: Any, chunks: list[Document], batch_size: int = EMBED_B
         logger.info("embedded %d/%d chunks", min(start + batch_size, len(chunks)), len(chunks))
         if start + batch_size < len(chunks):
             time.sleep(pause)
-
-
-def _is_transient(exc: Exception) -> bool:
-    text = str(exc)
-    return any(mark in text for mark in ("429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE", "deadline", "Deadline"))
 
 
 @lru_cache(maxsize=1)

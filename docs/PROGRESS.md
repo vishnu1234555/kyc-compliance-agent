@@ -8,13 +8,23 @@ is not `done`.
 |---|---|---|
 | 1 `extract` | done | regex reader + fine-tuned GLiNER2 model + ported validation/arbitration; extraction 269/279 regex only -> 276/279 with the model |
 | 3 `retrieve_rules` | done | PyPDFLoader -> paragraph splitter (citation metadata) -> Gemini embeddings -> Chroma; findings.py turns errors/fields into queries; all eight POLICY paragraph numbers verified against the official text |
-| 4 `decide` | pending | |
+| 4 `decide` | done | rules_decide baseline (R1-R8 except R6) + Gemini Flash-Lite structured verdict, citations filtered to retrieved paragraphs, approve skips human_review; LLM evals capped by the key's free tier (20 requests/day/model) |
 | 4b agentic `decide` | pending | |
 | 5 `human_review` | pending | |
 | 6 LangSmith | pending | |
 | Docs | pending | README, docs/WALKTHROUGH.md, CLAUDE.md roadmap |
 
 ## Blocked in this session (not faked in code)
+
+- **Gemini free tier on this GOOGLE_API_KEY: 20 generateContent requests per day per model.**
+  Found while running item 4's eval: `gemini-2.5-flash` hit `GenerateRequestsPerDayPerProjectPerModel-FreeTier,
+  limit: 20` after the first few cases, and `gemini-2.5-flash-lite` the same after about 22. A
+  30-case eval needs 30 calls (item 4) or roughly 100 (item 4b, 2-4 calls per case), so no
+  single model can finish a run on this key in one day. What was done: the decide node falls
+  back to the plain-code rules verdict when the LLM is out of quota and the scorecard prints how
+  many cases that happened to ("N LLM errors fell back to the rules"); a spent daily quota is
+  not retried. The committed item 4 scorecard is therefore a mix (see that commit). To rerun with
+  a billed key: `GEMINI_MODEL=gemini-2.5-flash .venv/bin/python evals/run_evals.py`.
 
 - **CPU-only torch wheels.** `download.pytorch.org/whl/cpu` answers, but the wheel files
   redirect to `download-r2.pytorch.org`, which the session's network policy rejects (403 on
@@ -104,3 +114,24 @@ any overlap against a guessed candidate.
   default `EMBEDDING_MODEL`.
 - `langchain_community.document_loaders.PyPDFLoader` prints a deprecation warning
   (langchain-community is being sunset); kept because the roadmap names PyPDFLoader.
+
+## Item 4: decide (done)
+
+- `decide.py`: `rules_decide` (POLICY R1-R8 except R6, from the findings; the baseline and the
+  fallback), `Verdict` (Pydantic: decision, citations, one-line reason), `build_messages`
+  (as-of date, masked fields, validation errors, retrieved paragraphs; never the raw document),
+  `llm_decide` (structured output, temperature 0, backoff on 429/503), and
+  `keep_retrieved_citations` (a citation the LLM makes that was not retrieved is dropped in code).
+- `nodes.decide`: `DECIDE_MODE=llm` (default) or `rules`; the rules verdict is always computed
+  and stored in `rules_verdict`, so one eval run reports both. `graph.py`: conditional edge,
+  approve -> END, otherwise human_review.
+- Model: `GEMINI_MODEL=gemini-2.5-flash-lite` by default, `GEMINI_THINKING_BUDGET=0`.
+  gemini-3.8-flash answered a one-word prompt in 70 s with 77 reasoning tokens and returned 503
+  "high demand" twice during the session; gemini-2.5-flash answered in about 1 s but its free
+  daily quota (20) was gone after the first probes and cases; Flash-Lite has the same cap. The
+  model is one env var away.
+- The eval scorecard now prints the decide-node accuracy and the rules-only accuracy side by
+  side, and names the model.
+- Observed in the partial LLM run: case 08 (adult born 12-12-2006, no validation error) was
+  escalated by Flash-Lite as a minor: an age calculation the model did on its own. The agent
+  version (item 4b) is told to use the date tool instead.

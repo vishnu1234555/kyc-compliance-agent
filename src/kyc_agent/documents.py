@@ -57,7 +57,7 @@ _KIND_RULES: list[tuple[str, re.Pattern[str]]] = [
     ("utility_bill", re.compile(
         r"electricity|utility bill|telephone bill|mobile bill|piped gas|gas bill|water bill"
         r"|consumer no|generation and distribution|power corporation|electricity board|\bbill date\b", re.I)),
-    ("aadhaar", re.compile(r"aadha?ar|unique identification authority|\bUIDAI\b|\bX{4}[\s-]?X{4}[\s-]?\d{4}\b", re.I)),
+    ("aadhaar", re.compile(r"aadha?ar|unique identification authority|\bUIDAI\b|\bX{4}[ -]?X{4}[ -]?\d{4}\b", re.I)),
 ]
 
 
