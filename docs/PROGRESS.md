@@ -9,7 +9,7 @@ is not `done`.
 | 1 `extract` | done | regex reader + fine-tuned GLiNER2 model + ported validation/arbitration; extraction 269/279 regex only -> 276/279 with the model |
 | 3 `retrieve_rules` | done | PyPDFLoader -> paragraph splitter (citation metadata) -> Gemini embeddings -> Chroma; findings.py turns errors/fields into queries; all eight POLICY paragraph numbers verified against the official text |
 | 4 `decide` | done | rules_decide baseline (R1-R8 except R6) + Gemini Flash-Lite structured verdict, citations filtered to retrieved paragraphs, approve skips human_review; LLM evals capped by the key's free tier (20 requests/day/model) |
-| 4b agentic `decide` | pending | |
+| 4b agentic `decide` | done (code + 3-case live check); 30-case numbers blocked by quota | tool loop: search_rbi_rules, check_kyc_due, compare_across_documents, submit_verdict; max 5 investigation calls; every call in the audit entry |
 | 5 `human_review` | pending | |
 | 6 LangSmith | pending | |
 | Docs | pending | README, docs/WALKTHROUGH.md, CLAUDE.md roadmap |
@@ -132,6 +132,41 @@ any overlap against a guessed candidate.
   model is one env var away.
 - The eval scorecard now prints the decide-node accuracy and the rules-only accuracy side by
   side, and names the model.
-- Observed in the partial LLM run: case 08 (adult born 12-12-2006, no validation error) was
-  escalated by Flash-Lite as a minor: an age calculation the model did on its own. The agent
-  version (item 4b) is told to use the date tool instead.
+- Item 4 scorecard: decide node 25/30, rules only 27/30, citation hit rate 0.7157. Seven cases
+  (23, 25-30) fell back to the rules when Flash-Lite's daily quota ran out; of the 23
+  LLM-decided cases 20 were right. LLM misses: case 08 (adult born 12-12-2006, no validation
+  error, escalated as a minor: age maths the model did on its own; item 4b hands dates to a
+  tool), case 22 (its placeholder name was never extracted, so R6 had nothing to judge), case
+  24 (a name mismatch across documents, invisible without the documents view; item 4b adds the
+  compare tool). Flash-Lite also tends to cite one of two paragraphs for a rule (cases 10, 19,
+  20), which is what pulled the citation hit rate down from 0.94.
+
+## Item 4b: agentic decide (code done; full scorecards blocked by the free-tier quota)
+
+- `agent.py`: Gemini with `bind_tools(..., tool_choice="any")` chooses among
+  `search_rbi_rules(query)` (the item 3 index; whatever it returns becomes citable),
+  `check_kyc_due(risk_category, last_kyc_date)` (exact date maths, `rules.kyc_due`),
+  `compare_across_documents(field)` (every document's value for name/dob/...), and ends with
+  `submit_verdict(decision, citations, reason)`, whose arguments are the structured output.
+  At most 5 investigation calls per case; after that only submit_verdict is allowed. Every
+  call, its arguments and its result (first 400 chars) go into the decide audit entry
+  (`tool_calls`), with `llm_calls` and `budget_exhausted`.
+- Two deterministic guardrails, both visible in the audit: a verdict is not recorded until
+  check_kyc_due and compare_across_documents("name"/"dob") have been called (the model is sent
+  back once; in the first live run Flash-Lite skipped the comparison on case 24 and approved
+  a name mismatch), and an approve carries no citations (the model cited para 42(1) on an
+  approve). Citations are still filtered to retrieved paragraphs in code.
+- `DECIDE_MODE=agent` selects it; `EVAL_CASES=case-01,case-15` runs a subset;
+  `EVAL_GOLD_FIELDS=1` makes validate/retrieve_rules/decide see the expected fields instead of
+  the extracted ones (extract still runs for its per-document values and its score).
+- Live check on 3 cases with `gemini-3.1-flash-lite` (the only bucket with quota left):
+  case 15 re_kyc via check_kyc_due (2 LLM calls, 18.7 s), case 24 approve before the guardrail
+  (the model never compared documents), case 01 approve with a stray para 42(1) citation
+  (now dropped). See the commit for the rerun after the guardrails.
+- **Blocked:** the four 30-case numbers the roadmap asks for (rules baseline, LLM without
+  tools, LLM with tools, LLM with tools on gold fields) need about 30 + 30 + 90 + 90
+  generateContent calls; this key allows 20 per model per day. The rules baseline is in every
+  scorecard (27/30). Commands for a billed key or another day:
+  `DECIDE_MODE=llm .venv/bin/python evals/run_evals.py`,
+  `DECIDE_MODE=agent .venv/bin/python evals/run_evals.py`,
+  `DECIDE_MODE=agent EVAL_GOLD_FIELDS=1 .venv/bin/python evals/run_evals.py`.

@@ -113,13 +113,19 @@ def build_messages(state: dict[str, Any], as_of: date | None = None) -> list[tup
     return [("system", SYSTEM_PROMPT), ("human", human)]
 
 
-def keep_retrieved_citations(citations: list[str], state: dict[str, Any]) -> tuple[list[str], list[str]]:
-    """Citations the LLM may make are exactly the retrieved ones; the rest are dropped, in code."""
+def keep_retrieved_citations(citations: list[str], state: dict[str, Any], decision: str = "") -> tuple[list[str], list[str]]:
+    """Citations the LLM may make are exactly the retrieved ones; the rest are dropped, in code.
+
+    An approve carries no citations (POLICY.md: nothing fired), so for an approve every
+    citation is dropped too.
+    """
     allowed = {chunk["citation"] for chunk in state.get("retrieved_rules", [])}
     kept: list[str] = []
     dropped: list[str] = []
     for citation in citations:
-        if citation in allowed and citation not in kept:
+        if decision == "approve":
+            dropped.append(citation)
+        elif citation in allowed and citation not in kept:
             kept.append(citation)
         elif citation not in allowed:
             dropped.append(citation)
@@ -131,7 +137,7 @@ def llm_decide(state: dict[str, Any], model: Any, as_of: date | None = None) -> 
     structured = model.with_structured_output(Verdict)
     messages = build_messages(state, as_of)
     verdict: Verdict = with_backoff(lambda: structured.invoke(messages), what="decide LLM call")
-    kept, dropped = keep_retrieved_citations(list(verdict.citations), state)
+    kept, dropped = keep_retrieved_citations(list(verdict.citations), state, verdict.decision)
     if dropped:
-        logger.warning("decide: dropped citations not among retrieved rules: %s", dropped)
+        logger.warning("decide: dropped citations (not retrieved, or an approve): %s", dropped)
     return Decision(verdict.decision, kept, " ".join(verdict.reason.split()), dropped_citations=dropped)

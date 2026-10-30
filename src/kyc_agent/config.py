@@ -25,7 +25,7 @@ class Settings:
     chroma_dir: str
     embedding_model: str
     retrieval_k: int
-    # decide: "rules" (baseline only, no LLM) or "llm" (Gemini Flash, structured output)
+    # decide: "rules" (baseline only, no LLM), "llm" (Gemini Flash, structured output) or "agent" (tool loop)
     decide_mode: str
     gemini_model: str
     gemini_thinking_budget: int | None

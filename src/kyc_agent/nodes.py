@@ -2,6 +2,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+from kyc_agent.agent import agent_decide
 from kyc_agent.config import get_settings
 from kyc_agent.decide import Decision, llm_decide, rules_decide
 from kyc_agent.extraction import extract_fields
@@ -111,18 +112,28 @@ def retrieve_rules(state: KYCState) -> KYCState:
 
 
 def decide(state: KYCState) -> KYCState:
-    """Rules baseline always; the LLM verdict on top unless DECIDE_MODE=rules. Falls back to the rules."""
+    """Rules baseline always; on top of it the LLM verdict (DECIDE_MODE=llm) or the tool-using agent
+    (DECIDE_MODE=agent). When the model cannot be reached the rules verdict stands, and the audit says so."""
     settings = get_settings()
     baseline = rules_decide(state)
     entry: dict[str, Any] = {"node": "decide", "mode": settings.decide_mode, "rules_baseline": baseline.decision,
                              "rules_fired": baseline.rules}
     verdict = baseline
-    if settings.decide_mode == "llm":
+    retrieved = state.get("retrieved_rules", [])
+    if settings.decide_mode in ("llm", "agent"):
         entry["model"] = settings.gemini_model
         try:
-            verdict = llm_decide(state, get_chat_model())
+            if settings.decide_mode == "agent":
+                run = agent_decide(state, get_chat_model(), default_index())
+                verdict = run.decision
+                retrieved = run.retrieved
+                entry["tool_calls"] = [record.as_dict() for record in run.tool_calls]
+                entry["llm_calls"] = run.llm_calls
+                entry["budget_exhausted"] = run.budget_exhausted
+            else:
+                verdict = llm_decide(state, get_chat_model())
             entry["dropped_citations"] = verdict.dropped_citations
-        except Exception as exc:  # the LLM is unreachable even after backoff: keep the file moving
+        except Exception as exc:  # the model is unreachable even after backoff: keep the file moving
             logger.error("decide: LLM failed (%s); applying the rules baseline", exc)
             entry["llm_error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
             verdict = Decision(baseline.decision, baseline.citations,
@@ -132,6 +143,7 @@ def decide(state: KYCState) -> KYCState:
     logger.info("decide: %s (rules baseline %s) citations %s", verdict.decision, baseline.decision, verdict.citations)
     return {
         **state,
+        "retrieved_rules": retrieved,
         "decision": verdict.decision,
         "rbi_citations": verdict.citations,
         "reason": verdict.reason,

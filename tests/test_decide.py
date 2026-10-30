@@ -57,6 +57,7 @@ def test_prompt_carries_fields_errors_and_retrieved_rules_only() -> None:
 def test_citations_outside_the_retrieved_set_are_dropped() -> None:
     kept, dropped = keep_retrieved_citations(["para 23(3)", "para 99", "para 23(3)", "para 42(1)"], _state({}))
     assert kept == ["para 23(3)"] and dropped == ["para 99", "para 42(1)"]
+    assert keep_retrieved_citations(["para 23(3)"], _state({}), decision="approve") == ([], ["para 23(3)"])
 
 
 class FakeChat:
@@ -122,3 +123,29 @@ def test_approve_skips_human_review_and_others_do_not(monkeypatch: pytest.Monkey
     bill = clean.replace("[Document 1: Passport]", "[Document 1: Electricity bill]")
     final = build_graph().invoke(_state({}) | {"raw_document": bill})
     assert final["decision"] == "re_kyc" and visited == ["human_review"]
+
+
+def test_decide_node_agent_mode_logs_tool_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    from langchain_core.messages import AIMessage
+
+    class OneShotAgentChat:
+        def bind_tools(self, tools: Any, tool_choice: str = "any") -> "OneShotAgentChat":
+            return self
+
+        def invoke(self, messages: Any) -> AIMessage:
+            if len(messages) == 2:  # first turn: the required checks
+                return AIMessage(content="", tool_calls=[
+                    {"name": "check_kyc_due", "args": {"risk_category": "high", "last_kyc_date": "15-06-2023"}, "id": "c1"},
+                    {"name": "compare_across_documents", "args": {"field": "name"}, "id": "c2"},
+                    {"name": "compare_across_documents", "args": {"field": "dob"}, "id": "c3"},
+                ])
+            return AIMessage(content="", tool_calls=[{"name": "submit_verdict", "args": {"decision": "re_kyc", "citations": ["para 23(3)"], "reason": "R4"}, "id": "c4"}])
+
+    monkeypatch.setenv("DECIDE_MODE", "agent")
+    monkeypatch.setattr(nodes, "get_chat_model", lambda: OneShotAgentChat())
+    state = _state({"pan": "AKLPR4821Q", "form60": False, "doc_type": "passport", "risk_category": "high", "last_kyc_date": "15-06-2023"})
+    out = nodes.decide(state)
+    entry = out["audit_log"][-1]
+    assert out["decision"] == "re_kyc" and entry["mode"] == "agent" and entry["llm_calls"] == 2
+    assert entry["tool_calls"][0]["tool"] == "check_kyc_due" and '"overdue": true' in entry["tool_calls"][0]["result"]
+    assert out["rbi_citations"] == ["para 23(3)"] and out["rules_verdict"]["rules"] == ["R4"]

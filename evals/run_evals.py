@@ -17,6 +17,7 @@ from typing import Any
 
 from langgraph.graph.state import CompiledStateGraph
 
+from kyc_agent import nodes
 from kyc_agent.config import get_settings
 from kyc_agent.extraction import extract_fields
 from kyc_agent.graph import build_graph
@@ -102,11 +103,17 @@ def score_validate(expected_fields: dict[str, Any], expected_errors: list[str]) 
     return score_validate_on(expected_fields, expected_errors)
 
 
-def run_graph(graph: CompiledStateGraph, raw_document: str) -> tuple[dict[str, Any], KYCState]:
+def select_cases(cases: list[dict[str, Any]], wanted: str) -> list[dict[str, Any]]:
+    """EVAL_CASES="case-01,case-15" keeps only those; empty keeps all."""
+    ids = {case_id.strip() for case_id in wanted.split(",") if case_id.strip()}
+    return [case for case in cases if case["id"] in ids] if ids else cases
+
+
+def run_graph(graph: CompiledStateGraph, raw_document: str, config: dict[str, Any] | None = None) -> tuple[dict[str, Any], KYCState]:
     """(extract's own output, before validate masks it; the final state)."""
     extracted: dict[str, Any] = {}
     final: KYCState | None = None
-    for mode, chunk in graph.stream(fresh_state(raw_document), stream_mode=["updates", "values"]):
+    for mode, chunk in graph.stream(fresh_state(raw_document), config=config, stream_mode=["updates", "values"]):
         if mode == "updates" and "extract" in chunk:
             extracted = chunk["extract"].get("extracted_fields", {})
         elif mode == "values":
@@ -116,8 +123,19 @@ def run_graph(graph: CompiledStateGraph, raw_document: str) -> tuple[dict[str, A
     return extracted, final
 
 
-def run_case(graph: CompiledStateGraph, case: dict[str, Any]) -> dict[str, Any]:
-    extracted, final = run_graph(graph, case["raw_document"])
+def run_on_gold_fields(case: dict[str, Any]) -> tuple[dict[str, Any], KYCState]:
+    """Decide on the expected fields instead of the extracted ones, to separate extraction errors
+    from decision errors. extract still runs (for its per-document values and the extraction score);
+    validate, retrieve_rules and decide then see the gold fields. human_review is not involved."""
+    after_extract = nodes.extract(fresh_state(case["raw_document"]))
+    extracted = dict(after_extract["extracted_fields"])
+    gold_state: KYCState = {**after_extract, "extracted_fields": drop_nulls(case["expected_fields"])}
+    final = nodes.decide(nodes.retrieve_rules(nodes.validate(gold_state)))
+    return extracted, final
+
+
+def run_case(graph: CompiledStateGraph, case: dict[str, Any], gold_fields: bool = False) -> dict[str, Any]:
+    extracted, final = run_on_gold_fields(case) if gold_fields else run_graph(graph, case["raw_document"])
     regex_only = extract_fields(case["raw_document"], NullReader()).fields
     logger.info("%s: decision expected %r, got %r", case["id"], case["expected_decision"], final["decision"])
     baseline = final.get("rules_verdict", {}).get("decision", "")
@@ -130,6 +148,8 @@ def run_case(graph: CompiledStateGraph, case: dict[str, Any]) -> dict[str, Any]:
         "decision": score_decision(case["expected_decision"], final["decision"]),
         "decision_rules": score_decision(case["expected_decision"], baseline),
         "llm_error": decide_entry.get("llm_error", ""),
+        "tool_calls": len([call for call in decide_entry.get("tool_calls", []) if call.get("tool") != "submit_verdict"]),
+        "llm_calls": decide_entry.get("llm_calls", 0),
         "citations": score_citations(case["expected_citations"], final["rbi_citations"]),
         "fields": score_fields(case["expected_fields"], extracted),
         "fields_regex": score_fields(case["expected_fields"], regex_only),
@@ -162,6 +182,8 @@ def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
     decision_hits = 0
     rules_hits = 0
     llm_errors = 0
+    tool_calls = 0
+    llm_calls = 0
     citation_rates: list[float] = []
     fields: Score = (0, 0)
     fields_regex: Score = (0, 0)
@@ -172,6 +194,8 @@ def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
         decision_hits += row["decision"][0]
         rules_hits += row.get("decision_rules", (0, 1))[0]
         llm_errors += 1 if row.get("llm_error") else 0
+        tool_calls += row.get("tool_calls", 0)
+        llm_calls += row.get("llm_calls", 0)
         hits, total = row["citations"]
         if total > 0:
             citation_rates.append(hits / total)
@@ -188,6 +212,8 @@ def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "decision_rules_accuracy": safe_divide(rules_hits, len(rows)),
         "decision_rules_hits": rules_hits,
         "llm_errors": llm_errors,
+        "tool_calls": tool_calls,
+        "llm_calls": llm_calls,
         "citation_hit_rate": safe_divide(sum(citation_rates), len(citation_rates)),
         "citation_cases": len(citation_rates),
         "extraction_accuracy": safe_divide(*fields),
@@ -227,6 +253,8 @@ def print_scorecard(summary: dict[str, Any], rows: list[dict[str, Any]], reader:
     fallbacks = [row["id"] for row in rows if row.get("llm_error")]
     if fallbacks:
         print(f"  LLM fallbacks           {', '.join(fallbacks)}")
+    if summary.get("tool_calls"):
+        print(f"  agent tool calls        {summary['tool_calls']} in total, {summary['tool_calls'] / n:.1f} per case; {summary['llm_calls']} LLM calls")
     print(f"  citation hit rate       {summary['citation_hit_rate']:.4f} (mean over {summary['citation_cases']} cases with expected citations)")
     print(f"  extraction accuracy     {summary['extraction_hits']}/{summary['extraction_total']} = {summary['extraction_accuracy']:.4f} (regex + PII model, extract's output before masking)")
     print(f"  extraction, regex only  {summary['extraction_regex_hits']}/{summary['extraction_regex_total']} = {summary['extraction_regex_accuracy']:.4f}")
@@ -256,9 +284,12 @@ def main() -> None:
     settings = get_settings()
     reader = f"{settings.pii_model} @ {settings.pii_threshold:.2f}"
     decider = settings.decide_mode if settings.decide_mode == "rules" else f"{settings.decide_mode} {settings.gemini_model}"
-    cases = load_cases()
+    gold_fields = os.environ.get("EVAL_GOLD_FIELDS", "") not in ("", "0", "false")
+    if gold_fields:
+        decider += " on GOLD fields"
+    cases = select_cases(load_cases(), os.environ.get("EVAL_CASES", ""))
     graph = build_graph()
-    rows = [run_case(graph, case) for case in cases]
+    rows = [run_case(graph, case, gold_fields) for case in cases]
     summary = summarise(rows)
     print_scorecard(summary, rows, reader, decider)
     LAST_RUN_PATH.write_text(json.dumps({"pii_model": reader, "decide": decider, **summary}, indent=2) + "\n", encoding="utf-8")

@@ -222,3 +222,16 @@ def test_record_header_is_in_the_raw_document(case: dict) -> None:
     fields = case["expected_fields"]
     assert f"Last KYC date: {fields['last_kyc_date']}" in case["raw_document"]
     assert f"Risk category: {fields['risk_category'].capitalize()}" in case["raw_document"]
+
+
+def test_select_cases_and_gold_fields_pipeline() -> None:
+    from evals.run_evals import run_on_gold_fields, select_cases
+
+    assert [case["id"] for case in select_cases(CASES, "case-24, case-01")] == ["case-01", "case-24"]
+    assert select_cases(CASES, "") is CASES
+    case = next(case for case in CASES if case["id"] == "case-26")  # refusal note: R7 without the PII model
+    extracted, final = run_on_gold_fields(case)  # DECIDE_MODE=rules under the test fixtures
+    assert extracted["name"] == "DEVENDRA RAWAT" and "dob" not in extracted
+    assert final["extracted_fields"] == drop_nulls(case["expected_fields"])
+    assert final["rules_verdict"]["decision"] == "escalate" and final["rules_verdict"]["rules"] == ["R1", "R2", "R7"]
+    assert [entry["node"] for entry in final["audit_log"]] == ["extract", "validate", "retrieve_rules", "decide"]
