@@ -15,11 +15,13 @@ TWELVE_DIGITS = re.compile(rb"\b\d{4}[ -]?\d{4}[ -]?\d{4}\b")
 # LangGraph channel versions look like "00000000000000000000000000000002.0.5078476676515129": a 32-digit
 # counter and a random float. They are bookkeeping, not Aadhaar numbers, so they are removed before the search.
 CHANNEL_VERSION = re.compile(rb"\d{32}\.\d+\.\d+")
+# Checkpoint and run ids are UUIDs; one whose last group happens to be all digits is not an Aadhaar number either.
+UUID = re.compile(rb"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 CASE_14 = next(case for case in load_cases() if case["id"] == "case-14")  # Aadhaar printed in full
 
 
 def has_full_aadhaar(data: bytes) -> bool:
-    return TWELVE_DIGITS.search(CHANNEL_VERSION.sub(b"", data)) is not None
+    return TWELVE_DIGITS.search(UUID.sub(b"", CHANNEL_VERSION.sub(b"", data))) is not None
 
 
 def _all_bytes(value: Any) -> list[bytes]:
@@ -36,6 +38,7 @@ def _all_bytes(value: Any) -> list[bytes]:
 def test_the_detector_itself() -> None:
     assert has_full_aadhaar(b"name\x00 9999 4512 7782 \x00") and has_full_aadhaar(b"a 999945127782 b")
     assert not has_full_aadhaar(b"XXXX-XXXX-7782 00000000000000000000000000000002.0.5078476676515129 DL04 20150099812")
+    assert not has_full_aadhaar(b"id 1f1d5002-73f1-6d55-8000-123456789012 end")  # a UUID with a digit-only last group
 
 
 def test_mask_data_masks_strings_everywhere_but_bookkeeping() -> None:
@@ -65,9 +68,10 @@ def test_sqlite_checkpoint_file_holds_no_full_aadhaar(tmp_path: Path) -> None:
     assert paused["validation_errors"] == ["Aadhaar must be masked as XXXX-XXXX-1234"]
     assert paused["extracted_fields"]["aadhaar"] == "XXXX-XXXX-7782" and paused["decision"] == "re_kyc"
     assert "__interrupt__" in paused  # paused at human_review, so every earlier checkpoint is on disk
-    for file in tmp_path.iterdir():  # the database and any journal or WAL file next to it
-        assert not has_full_aadhaar(file.read_bytes()), f"full Aadhaar number inside {file.name}"
-        assert b"XXXX-XXXX-7782" in file.read_bytes() or file.name != db.name  # the masked form is what was stored
+    files = {file.name: file.read_bytes() for file in tmp_path.iterdir()}  # the database and its WAL/journal files
+    for name, data in files.items():
+        assert not has_full_aadhaar(data), f"full Aadhaar number inside {name}"
+    assert any(b"XXXX-XXXX-7782" in data for data in files.values())  # the masked form is what was stored
     # the stored state is usable: resume and finish
     final = graph.invoke(Command(resume={"reviewer": "test", "action": "confirm"}), config=config)
     assert final["audit_log"][-1]["node"] == "human_review" and final["decision"] == "re_kyc"
