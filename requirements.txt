@@ -1,0 +1,20 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# CPU-only torch, same pin as github.com/vishnu1234555/Aadhaar-Final: this is a text model and the
+# CUDA wheels add about 2 GB for nothing.
+torch==2.5.1+cpu
+# [local] is required: a bare gliner2 install is only the HTTP client and cannot load local weights.
+gliner2[local]==2.0.0
+
+langgraph>=0.2
+langchain>=0.3
+langsmith>=0.1
+# retrieve_rules: PyPDFLoader (langchain-community + pypdf), the splitter, Gemini embeddings, Chroma
+langchain-community>=0.3
+pypdf>=5
+langchain-text-splitters>=0.3
+langchain-google-genai>=2.1
+langchain-chroma>=0.2
+python-dotenv>=1.0
+pydantic>=2,<3
+pytest>=8.0

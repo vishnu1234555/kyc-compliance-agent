@@ -1,0 +1,746 @@
+[
+  {
+    "id": "case-01",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10001\nRisk category: Medium\nLast KYC date: 14-02-2022\n\n[Document 1: Passport]\nREPUBLIC OF INDIA\nPassport No: N8231904\nName: MEENAKSHI RAGHAVAN\nDate of birth: 15/08/1990\nPlace of birth: SALEM\nAddress: 14 Kamaraj Street, Salem, Tamil Nadu\nPIN: 636001\n\n[Document 2: PAN card]\nINCOME TAX DEPARTMENT\nGOVT. OF INDIA\nPermanent Account Number Card\nAKLPR4821Q\nMEENAKSHI RAGHAVAN\n15/08/1990\n",
+    "expected_fields": {
+      "name": "MEENAKSHI RAGHAVAN",
+      "dob": "15-08-1990",
+      "pan": "AKLPR4821Q",
+      "form60": false,
+      "aadhaar": null,
+      "address": "14 Kamaraj Street, Salem, Tamil Nadu",
+      "pincode": "636001",
+      "doc_type": "passport",
+      "risk_category": "medium",
+      "last_kyc_date": "14-02-2022"
+    },
+    "expected_errors": [],
+    "expected_decision": "approve",
+    "expected_citations": [],
+    "why": "none: passport is an OVD, PAN valid, no Aadhaar on file (allowed), medium risk updated 2022; nothing fires",
+    "tags": [
+      "unlabelled"
+    ]
+  },
+  {
+    "id": "case-02",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10002\nRisk category: Low\nLast KYC date: 03-07-2020\n\nGovernment of India\nUnique Identification Authority of India\nArvind Kulkarni\nDOB: 02/11/1984\nMALE\nXXXX XXXX 4321\nAddress: S/O Prakash Kulkarni, 221 Koramangala 5th Block, Bengaluru, Karnataka\n560034\n\nINCOME TAX DEPARTMENT\nGOVT. OF INDIA\nPermanent Account Number Card\nBXMPK7730L\nARVIND KULKARNI\n02/11/1984\n",
+    "expected_fields": {
+      "name": "ARVIND KULKARNI",
+      "dob": "02-11-1984",
+      "pan": "BXMPK7730L",
+      "form60": false,
+      "aadhaar": "XXXX-XXXX-4321",
+      "address": "S/O Prakash Kulkarni, 221 Koramangala 5th Block, Bengaluru, Karnataka",
+      "pincode": "560034",
+      "doc_type": "aadhaar",
+      "risk_category": "low",
+      "last_kyc_date": "03-07-2020"
+    },
+    "expected_errors": [],
+    "expected_decision": "approve",
+    "expected_citations": [],
+    "why": "none: masked Aadhaar is an OVD, PAN valid, low risk updated 2020; nothing fires (no document titles, values unlabeled)",
+    "tags": [
+      "unlabelled",
+      "no_titles"
+    ]
+  },
+  {
+    "id": "case-03",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10003\nRisk category: Medium\nLast KYC date: 21-11-2023\n\n[Document 1: Voter ID card]\nELECTION COMMISSION OF INDIA\nElector's Photo Identity Card\nEPIC No: BRQ1234567\nElector's Name: Farhan Siddiqui\nFather's Name: Imran Siddiqui\nDate of Birth: 23-04-1979\nAddress: 9 Ashok Rajpath, Patna, Bihar\nPIN Code: 800001\n\n[Document 2: Form No. 60]\nFORM NO. 60\nDeclaration to be made by a person who does not have a Permanent Account Number\nName: Farhan Siddiqui\nDate of birth: 23-04-1979\nAddress: 9 Ashok Rajpath, Patna, Bihar 800001\nI declare that I do not have a PAN. Signed on 21-11-2023.\n",
+    "expected_fields": {
+      "name": "FARHAN SIDDIQUI",
+      "dob": "23-04-1979",
+      "pan": null,
+      "form60": true,
+      "aadhaar": null,
+      "address": "9 Ashok Rajpath, Patna, Bihar",
+      "pincode": "800001",
+      "doc_type": "voter_id",
+      "risk_category": "medium",
+      "last_kyc_date": "21-11-2023"
+    },
+    "expected_errors": [],
+    "expected_decision": "approve",
+    "expected_citations": [],
+    "why": "none: voter ID is an OVD, Form 60 instead of PAN is allowed, medium risk updated 2023; nothing fires",
+    "tags": []
+  },
+  {
+    "id": "case-04",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10004\nRisk category: High\nLast KYC date: 09-03-2026\n\n[Document 1: Driving Licence]\nMAHARASHTRA STATE MOTOR DRIVING LICENCE\nDL No: MH12 20110045678\nName: PRIYA VENKATESAN\nDate of Birth: 30-01-1992\nAddress: Flat 4, Sunrise Society, Kothrud, Pune, Maharashtra\nPIN: 411038\nValid till: 29-01-2032\n\n[Document 2: PAN card]\nPermanent Account Number: CHRPV5566M\nName: PRIYA VENKATESAN\nDate of Birth: 30-01-1992\n",
+    "expected_fields": {
+      "name": "PRIYA VENKATESAN",
+      "dob": "30-01-1992",
+      "pan": "CHRPV5566M",
+      "form60": false,
+      "aadhaar": null,
+      "address": "Flat 4, Sunrise Society, Kothrud, Pune, Maharashtra",
+      "pincode": "411038",
+      "doc_type": "driving_licence",
+      "risk_category": "high",
+      "last_kyc_date": "09-03-2026"
+    },
+    "expected_errors": [],
+    "expected_decision": "approve",
+    "expected_citations": [],
+    "why": "none: driving licence is an OVD, PAN valid, no Aadhaar at all (allowed), high risk updated 09-03-2026 (due 09-03-2028); nothing fires",
+    "tags": []
+  },
+  {
+    "id": "case-05",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10005\nRisk category: Low\nLast KYC date: 12-12-2019\n\n[Document 1: NREGA Job Card]\nMAHATMA GANDHI NATIONAL RURAL EMPLOYMENT GUARANTEE SCHEME\nJob Card No: TN-20-004-012-0045\nName of applicant: Thangaraj Pandian\nDate of birth: 11-06-1971\nAddress: Ward 4, Keelakarai, Ramanathapuram District, Tamil Nadu\nPIN: 623517\nIssued and signed by: Block Development Officer, Government of Tamil Nadu\n\n[Document 2: PAN card]\nINCOME TAX DEPARTMENT\nGOVT. OF INDIA\nPermanent Account Number Card\nDKEPPl234Q\nTHANGARAJ PANDIAN\n11/06/1971\n",
+    "expected_fields": {
+      "name": "THANGARAJ PANDIAN",
+      "dob": "11-06-1971",
+      "pan": "DKEPP1234Q",
+      "form60": false,
+      "aadhaar": null,
+      "address": "Ward 4, Keelakarai, Ramanathapuram District, Tamil Nadu",
+      "pincode": "623517",
+      "doc_type": "nrega_job_card",
+      "risk_category": "low",
+      "last_kyc_date": "12-12-2019"
+    },
+    "expected_errors": [],
+    "expected_decision": "approve",
+    "expected_citations": [],
+    "why": "none: NREGA job card signed by a State Govt officer is an OVD, PAN valid once OCR 'l' is read as '1', low risk updated 2019; nothing fires",
+    "tags": [
+      "unlabelled",
+      "ocr_noise"
+    ]
+  },
+  {
+    "id": "case-06",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10006\nRisk category: Medium\nLast KYC date: 05-05-2021\n\n[Document 1: National Population Register letter]\nNATIONAL POPULATION REGISTER\nOffice of the Registrar General, India\nNPR Ref: NPR/AS/2023/0001187\nThis is to certify that Debashish Mondal, date of birth 19-09-1980, is registered in the National Population Register at the address below.\nHouse 7, Zoo Road, Guwahati, Assam\n781001\n\n[Document 2: Aadhaar card]\nGovernment of India\nDebashish Mondal\nDOB: 19/09/1980\nMALE\nXXXX XXXX 8812\n\n[Document 3: PAN card]\nINCOME TAX DEPARTMENT\nPermanent Account Number Card\nFGQPM2210A\nDEBASHISH MONDAL\n19/09/1980\n",
+    "expected_fields": {
+      "name": "DEBASHISH MONDAL",
+      "dob": "19-09-1980",
+      "pan": "FGQPM2210A",
+      "form60": false,
+      "aadhaar": "XXXX-XXXX-8812",
+      "address": "House 7, Zoo Road, Guwahati, Assam",
+      "pincode": "781001",
+      "doc_type": "npr_letter",
+      "risk_category": "medium",
+      "last_kyc_date": "05-05-2021"
+    },
+    "expected_errors": [],
+    "expected_decision": "approve",
+    "expected_citations": [],
+    "why": "none: NPR letter with name and address is an OVD, masked Aadhaar, PAN valid, medium risk updated 2021; nothing fires",
+    "tags": [
+      "unlabelled"
+    ]
+  },
+  {
+    "id": "case-07",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10007\nRisk category: High\nLast KYC date: 18-05-2026\n\n[Document 1: Aadhaar card]\nGovernment of India\nUnique Identification Authority of India\nLakshmi Narayanan\nDOB: 27/02/1968\nFEMALE\nXXXX XXXX 7O42\nAddress: 3-6-144 Himayatnagar, Hyderabad, Telangana\n500029\n\n[Document 2: PAN card]\nINCOME TAX DEPARTMENT\nPermanent Account Number Card\nGJTPN9087C\nLAKSHMI NARAYANAN\n27/02/1968\n",
+    "expected_fields": {
+      "name": "LAKSHMI NARAYANAN",
+      "dob": "27-02-1968",
+      "pan": "GJTPN9087C",
+      "form60": false,
+      "aadhaar": "XXXX-XXXX-7042",
+      "address": "3-6-144 Himayatnagar, Hyderabad, Telangana",
+      "pincode": "500029",
+      "doc_type": "aadhaar",
+      "risk_category": "high",
+      "last_kyc_date": "18-05-2026"
+    },
+    "expected_errors": [],
+    "expected_decision": "approve",
+    "expected_citations": [],
+    "why": "none: masked Aadhaar (OCR 'O' is '0') is an OVD, PAN valid, high risk updated 18-05-2026 (due 18-05-2028); nothing fires",
+    "tags": [
+      "unlabelled",
+      "ocr_noise"
+    ]
+  },
+  {
+    "id": "case-08",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10008\nRisk category: Low\nLast KYC date: 30-06-2025\n\n[Document 1: Passport]\nREPUBLIC OF INDIA\nPassport No: P4410932\nName: ROHAN DESHPANDE\nDate of birth: 12/12/2006\nPlace of birth: MUMBAI\nAddress: 12 Hill Road, Bandra West, Mumbai, Maharashtra\nPIN: 400050\n\n[Document 2: PAN card]\nPermanent Account Number: HLWPD3391E\nName: ROHAN DESHPANDE\nDate of Birth: 12-12-2006\n\n[Document 3: Aadhaar card]\nAadhaar No: XXXX XXXX 2210\nName: Rohan Deshpande\nDOB: 12/12/2006\n",
+    "expected_fields": {
+      "name": "ROHAN DESHPANDE",
+      "dob": "12-12-2006",
+      "pan": "HLWPD3391E",
+      "form60": false,
+      "aadhaar": "XXXX-XXXX-2210",
+      "address": "12 Hill Road, Bandra West, Mumbai, Maharashtra",
+      "pincode": "400050",
+      "doc_type": "passport",
+      "risk_category": "low",
+      "last_kyc_date": "30-06-2025"
+    },
+    "expected_errors": [],
+    "expected_decision": "approve",
+    "expected_citations": [],
+    "why": "none: passport is an OVD, adult (19), PAN valid, masked Aadhaar, low risk updated 2025; nothing fires",
+    "tags": []
+  },
+  {
+    "id": "case-09",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10009\nRisk category: Medium\nLast KYC date: 17-08-2024\n\n[Document 1: Voter ID card]\nELECTION COMMISSION OF INDIA\nEPIC No: PBX7788123\nElector's Name: Harpreet Kaur Dhillon\nHusband's Name: Jaswinder Singh Dhillon\nDate of Birth: 09-10-1986\nAddress: 22 Lawrence Road, Amritsar, Punjab\nPIN Code: 143001\n\n[Document 2: PAN card]\nINCOME TAX DEPARTMENT\nGOVT. OF INDIA\nPermanent Account Number Card\nJNEPD4478H\nHARPREET KAUR DHILLON\n09/10/1986\n",
+    "expected_fields": {
+      "name": "HARPREET KAUR DHILLON",
+      "dob": "09-10-1986",
+      "pan": "JNEPD4478H",
+      "form60": false,
+      "aadhaar": null,
+      "address": "22 Lawrence Road, Amritsar, Punjab",
+      "pincode": "143001",
+      "doc_type": "voter_id",
+      "risk_category": "medium",
+      "last_kyc_date": "17-08-2024"
+    },
+    "expected_errors": [],
+    "expected_decision": "approve",
+    "expected_citations": [],
+    "why": "none: voter ID is an OVD, PAN valid (unlabeled on the card), medium risk updated 2024; nothing fires",
+    "tags": [
+      "unlabelled"
+    ]
+  },
+  {
+    "id": "case-10",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10010\nRisk category: Medium\nLast KYC date: 22-01-2022\n\n[Document 1: Electricity bill]\nTAMIL NADU GENERATION AND DISTRIBUTION CORPORATION LTD\nConsumer No: 04-123-456-789\nName: Kavitha Subramaniam\nService address: 18 Race Course Road, Coimbatore, Tamil Nadu\nPIN: 641018\nBill date: 03-09-2026\nAmount due: Rs 1,240\n\n[Document 2: PAN card]\nINCOME TAX DEPARTMENT\nPermanent Account Number Card\nKPRPS6612B\nKAVITHA SUBRAMANIAM\n14/03/1983\n",
+    "expected_fields": {
+      "name": "KAVITHA SUBRAMANIAM",
+      "dob": "14-03-1983",
+      "pan": "KPRPS6612B",
+      "form60": false,
+      "aadhaar": null,
+      "address": "18 Race Course Road, Coimbatore, Tamil Nadu",
+      "pincode": "641018",
+      "doc_type": "utility_bill",
+      "risk_category": "medium",
+      "last_kyc_date": "22-01-2022"
+    },
+    "expected_errors": [],
+    "expected_decision": "re_kyc",
+    "expected_citations": [
+      "para 5(1)(xiv)",
+      "para 23(3)"
+    ],
+    "why": "R1: the only identity document is an electricity bill, which proves address only; no OVD on file",
+    "tags": [
+      "unlabelled"
+    ]
+  },
+  {
+    "id": "case-11",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10011\nRisk category: Low\nLast KYC date: 08-08-2020\n\n[Document 1: Property tax receipt]\nJAIPUR MUNICIPAL CORPORATION\nProperty Tax Receipt for 2026-27\nReceipt No: JMC/PT/2026/118822\nOwner: Manisha Choudhary\nProperty address: 45 Bapu Bazar, Jaipur, Rajasthan\nPIN: 302003\nAmount paid: Rs 6,500 on 14-06-2026\n\n[Document 2: PAN card]\nPermanent Account Number: LMNPC8821F\nName: MANISHA CHOUDHARY\nDate of Birth: 21-07-1975\n",
+    "expected_fields": {
+      "name": "MANISHA CHOUDHARY",
+      "dob": "21-07-1975",
+      "pan": "LMNPC8821F",
+      "form60": false,
+      "aadhaar": null,
+      "address": "45 Bapu Bazar, Jaipur, Rajasthan",
+      "pincode": "302003",
+      "doc_type": "property_tax_receipt",
+      "risk_category": "low",
+      "last_kyc_date": "08-08-2020"
+    },
+    "expected_errors": [],
+    "expected_decision": "re_kyc",
+    "expected_citations": [
+      "para 5(1)(xiv)",
+      "para 23(3)"
+    ],
+    "why": "R1: a property tax receipt proves address only; no OVD on file",
+    "tags": []
+  },
+  {
+    "id": "case-12",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10012\nRisk category: Medium\nLast KYC date: 10-10-2023\n\n[Document 1: Passport]\nREPUBLIC OF INDIA\nPassport No: R9902211\nName: GURPREET SINGH SANDHU\nDate of birth: 03/03/1981\nPlace of birth: CHANDIGARH\nAddress: House 1204, Sector 17, Chandigarh\nPIN: 160017\n\n[Document 2: PAN card]\nINCOME TAX DEPARTMENT\nPermanent Account Number Card\nKLMPS4521\nGURPREET SINGH SANDHU\n03/03/1981\n",
+    "expected_fields": {
+      "name": "GURPREET SINGH SANDHU",
+      "dob": "03-03-1981",
+      "pan": "KLMPS4521",
+      "form60": false,
+      "aadhaar": null,
+      "address": "House 1204, Sector 17, Chandigarh",
+      "pincode": "160017",
+      "doc_type": "passport",
+      "risk_category": "medium",
+      "last_kyc_date": "10-10-2023"
+    },
+    "expected_errors": [
+      "PAN format invalid"
+    ],
+    "expected_decision": "re_kyc",
+    "expected_citations": [
+      "para 23(5)"
+    ],
+    "why": "R2: PAN on file is 9 characters (check letter missing), so the format is wrong",
+    "tags": [
+      "unlabelled"
+    ]
+  },
+  {
+    "id": "case-13",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10013\nRisk category: Low\nLast KYC date: 16-02-2021\n\n[Document 1: Aadhaar card]\nGovernment of India\nUnique Identification Authority of India\nNusrat Jahan\nDOB: 28/12/1995\nFEMALE\nXXXX XXXX 5190\nAddress: 11 Hazratganj, Lucknow, Uttar Pradesh\n226001\n",
+    "expected_fields": {
+      "name": "NUSRAT JAHAN",
+      "dob": "28-12-1995",
+      "pan": null,
+      "form60": false,
+      "aadhaar": "XXXX-XXXX-5190",
+      "address": "11 Hazratganj, Lucknow, Uttar Pradesh",
+      "pincode": "226001",
+      "doc_type": "aadhaar",
+      "risk_category": "low",
+      "last_kyc_date": "16-02-2021"
+    },
+    "expected_errors": [],
+    "expected_decision": "re_kyc",
+    "expected_citations": [
+      "para 23(5)"
+    ],
+    "why": "R2: no PAN and no Form 60 anywhere in the file",
+    "tags": [
+      "unlabelled"
+    ]
+  },
+  {
+    "id": "case-14",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10014\nRisk category: Medium\nLast KYC date: 25-03-2022\n\nGovernment of India\nUnique Identification Authority of India\nVikram Bhosale\nDOB: 06/06/1977\nMALE\n9999 4512 7782\nAddress: 51 Dharampeth, Nagpur, Maharashtra\n440010\n\nINCOME TAX DEPARTMENT\nGOVT. OF INDIA\nPermanent Account Number Card\nMQAPB1930D\nVIKRAM BHOSALE\n06/06/1977\n",
+    "expected_fields": {
+      "name": "VIKRAM BHOSALE",
+      "dob": "06-06-1977",
+      "pan": "MQAPB1930D",
+      "form60": false,
+      "aadhaar": "9999-4512-7782",
+      "address": "51 Dharampeth, Nagpur, Maharashtra",
+      "pincode": "440010",
+      "doc_type": "aadhaar",
+      "risk_category": "medium",
+      "last_kyc_date": "25-03-2022"
+    },
+    "expected_errors": [
+      "Aadhaar must be masked as XXXX-XXXX-1234"
+    ],
+    "expected_decision": "re_kyc",
+    "expected_citations": [
+      "para 23 Explanation 1"
+    ],
+    "why": "R3: the Aadhaar number is visible in full on the card copy; it must be masked",
+    "tags": [
+      "unlabelled",
+      "no_titles",
+      "unmasked_aadhaar"
+    ]
+  },
+  {
+    "id": "case-15",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10015\nRisk category: High\nLast KYC date: 15-06-2023\n\n[Document 1: Passport]\nREPUBLIC OF INDIA\nPassport No: T1120034\nName: RAMESH CHANDRA GUPTA\nDate of birth: 19/01/1965\nPlace of birth: DELHI\nAddress: B-44 Preet Vihar, Delhi\nPIN: 11OO92\n\n[Document 2: PAN card]\nPermanent Account Number: NRTPG2204J\nName: RAMESH CHANDRA GUPTA\nDate of Birth: 19-01-1965\n\n[Document 3: Aadhaar card]\nAadhaar No: XXXX XXXX 3307\nName: Ramesh Chandra Gupta\nDOB: 19/01/1965\n",
+    "expected_fields": {
+      "name": "RAMESH CHANDRA GUPTA",
+      "dob": "19-01-1965",
+      "pan": "NRTPG2204J",
+      "form60": false,
+      "aadhaar": "XXXX-XXXX-3307",
+      "address": "B-44 Preet Vihar, Delhi",
+      "pincode": "110092",
+      "doc_type": "passport",
+      "risk_category": "high",
+      "last_kyc_date": "15-06-2023"
+    },
+    "expected_errors": [],
+    "expected_decision": "re_kyc",
+    "expected_citations": [
+      "para 42(1)"
+    ],
+    "why": "R4: high-risk file last updated 15-06-2023; the 2-year limit passed on 15-06-2025 (PIN OCR 'O' is '0')",
+    "tags": [
+      "ocr_noise"
+    ]
+  },
+  {
+    "id": "case-16",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10016\nRisk category: Low\nLast KYC date: 20-01-2015\n\n[Document 1: Voter ID card]\nELECTION COMMISSION OF INDIA\nEPIC No: MPK5531902\nElector's Name: Sunita Yadav\nHusband's Name: Mahesh Yadav\nDate of Birth: O3-11-1975\nAddress: 8 Arera Colony, Bhopal, Madhya Pradesh\nPIN Code: 462016\n\n[Document 2: PAN card]\nPermanent Account Number: PSVPY7765K\nName: SUNITA YADAV\nDate of Birth: 03-11-1975\n",
+    "expected_fields": {
+      "name": "SUNITA YADAV",
+      "dob": "03-11-1975",
+      "pan": "PSVPY7765K",
+      "form60": false,
+      "aadhaar": null,
+      "address": "8 Arera Colony, Bhopal, Madhya Pradesh",
+      "pincode": "462016",
+      "doc_type": "voter_id",
+      "risk_category": "low",
+      "last_kyc_date": "20-01-2015"
+    },
+    "expected_errors": [],
+    "expected_decision": "re_kyc",
+    "expected_citations": [
+      "para 42(1)"
+    ],
+    "why": "R4: low-risk file last updated 20-01-2015; the 10-year limit passed on 20-01-2025 (DOB OCR 'O' is '0', PAN card confirms)",
+    "tags": [
+      "ocr_noise"
+    ]
+  },
+  {
+    "id": "case-17",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10017\nRisk category: Low\nLast KYC date: 14-09-2019\n\n[Document 1: Aadhaar card]\nAadhaar No: XXXX XXXX 6001\nName: Karthik Rajendran\nDOB: 08/08/1989\nAddress: 7 Officers Line, Vellore, Tamil Nadu\nPIN: 63200\n\n[Document 2: PAN card]\nPermanent Account Number: QTCPR5508N\nName: KARTHIK RAJENDRAN\nDate of Birth: 08-08-1989\n",
+    "expected_fields": {
+      "name": "KARTHIK RAJENDRAN",
+      "dob": "08-08-1989",
+      "pan": "QTCPR5508N",
+      "form60": false,
+      "aadhaar": "XXXX-XXXX-6001",
+      "address": "7 Officers Line, Vellore, Tamil Nadu",
+      "pincode": "63200",
+      "doc_type": "aadhaar",
+      "risk_category": "low",
+      "last_kyc_date": "14-09-2019"
+    },
+    "expected_errors": [
+      "PIN code invalid"
+    ],
+    "expected_decision": "re_kyc",
+    "expected_citations": [],
+    "why": "R5: PIN on file has 5 digits and the missing digit cannot be known",
+    "tags": []
+  },
+  {
+    "id": "case-18",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10018\nRisk category: Medium\nLast KYC date: 02-02-2023\n\n[Document 1: Driving Licence]\nDELHI TRANSPORT DEPARTMENT - DRIVING LICENCE\nDL No: DL04 20150099812\nName: POOJA NAIR\nDate of Birth: 17-05-1993\nAddress: Flat 12, Sector 10, Dwarka, New Delhi\nPIN: 011001\nValid till: 16-05-2033\n\n[Document 2: PAN card]\nPermanent Account Number: RWBPN6690P\nName: POOJA NAIR\nDate of Birth: 17-05-1993\n",
+    "expected_fields": {
+      "name": "POOJA NAIR",
+      "dob": "17-05-1993",
+      "pan": "RWBPN6690P",
+      "form60": false,
+      "aadhaar": null,
+      "address": "Flat 12, Sector 10, Dwarka, New Delhi",
+      "pincode": "011001",
+      "doc_type": "driving_licence",
+      "risk_category": "medium",
+      "last_kyc_date": "02-02-2023"
+    },
+    "expected_errors": [
+      "PIN code invalid"
+    ],
+    "expected_decision": "re_kyc",
+    "expected_citations": [],
+    "why": "R5: PIN on file starts with 0, which no Indian PIN does",
+    "tags": []
+  },
+  {
+    "id": "case-19",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10019\nRisk category: Medium\nLast KYC date: 11-11-2016\n\n[Document 1: NREGA Job Card]\nMAHATMA GANDHI NATIONAL RURAL EMPLOYMENT GUARANTEE SCHEME\nJob Card No: OR-05-011-004-0102\nName of applicant: Mohammed Irfan Khan\nDate of birth: 25-10-1974\nAddress: Village Jatni, Khordha District, Odisha\nPIN: 752050\nIssued and signed by: Block Development Officer, Government of Odisha\n\n[Document 2: PAN card]\nINCOME TAX DEPARTMENT\nPermanent Account Number Card\nABPPK123A\nMOHAMMED IRFAN KHAN\n25/10/1974\n",
+    "expected_fields": {
+      "name": "MOHAMMED IRFAN KHAN",
+      "dob": "25-10-1974",
+      "pan": "ABPPK123A",
+      "form60": false,
+      "aadhaar": null,
+      "address": "Village Jatni, Khordha District, Odisha",
+      "pincode": "752050",
+      "doc_type": "nrega_job_card",
+      "risk_category": "medium",
+      "last_kyc_date": "11-11-2016"
+    },
+    "expected_errors": [
+      "PAN format invalid"
+    ],
+    "expected_decision": "re_kyc",
+    "expected_citations": [
+      "para 23(5)",
+      "para 42(1)"
+    ],
+    "why": "R2+R4: PAN has only 3 digits; medium-risk file last updated 11-11-2016, the 8-year limit passed on 11-11-2024",
+    "tags": [
+      "unlabelled"
+    ]
+  },
+  {
+    "id": "case-20",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10020\nRisk category: Low\nLast KYC date: 30-03-2021\n\n[Document 1: Pension Payment Order]\nGOVERNMENT OF KERALA - PENSION PAYMENT ORDER\nPPO No: KL/PEN/2019/55120\nPensioner: Suresh Babu Mahapatra\nDate of birth: 04-07-1958\nAadhaar: 9999 7788 1122\nAddress: TC 14/221 Sasthamangalam, Thiruvananthapuram, Kerala\nPIN: 695010\nMonthly pension: Rs 32,400\n\n[Document 2: PAN card]\nPermanent Account Number: STHPM4410G\nName: SURESH BABU MAHAPATRA\nDate of Birth: 04-07-1958\n",
+    "expected_fields": {
+      "name": "SURESH BABU MAHAPATRA",
+      "dob": "04-07-1958",
+      "pan": "STHPM4410G",
+      "form60": false,
+      "aadhaar": "9999-7788-1122",
+      "address": "TC 14/221 Sasthamangalam, Thiruvananthapuram, Kerala",
+      "pincode": "695010",
+      "doc_type": "pension_order",
+      "risk_category": "low",
+      "last_kyc_date": "30-03-2021"
+    },
+    "expected_errors": [
+      "Aadhaar must be masked as XXXX-XXXX-1234"
+    ],
+    "expected_decision": "re_kyc",
+    "expected_citations": [
+      "para 5(1)(xiv)",
+      "para 23(3)",
+      "para 23 Explanation 1"
+    ],
+    "why": "R1+R3: a pension payment order proves address only, no OVD on file; and it prints the Aadhaar number in full",
+    "tags": [
+      "unmasked_aadhaar"
+    ]
+  },
+  {
+    "id": "case-21",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10021\nRisk category: Medium\nLast KYC date: 19-07-2022\n\nGovernment of India\nUnique Identification Authority of India\nSneha Patil\nDOB: 02/09/1991\nFEMALE\n9999 6543 2101\nAddress: 30 Deccan Gymkhana, Pune, Maharashtra\n41100\n\nINCOME TAX DEPARTMENT\nPermanent Account Number Card\nUVDPP8123R\nSNEHA PATIL\n02/09/1991\n",
+    "expected_fields": {
+      "name": "SNEHA PATIL",
+      "dob": "02-09-1991",
+      "pan": "UVDPP8123R",
+      "form60": false,
+      "aadhaar": "9999-6543-2101",
+      "address": "30 Deccan Gymkhana, Pune, Maharashtra",
+      "pincode": "41100",
+      "doc_type": "aadhaar",
+      "risk_category": "medium",
+      "last_kyc_date": "19-07-2022"
+    },
+    "expected_errors": [
+      "Aadhaar must be masked as XXXX-XXXX-1234",
+      "PIN code invalid"
+    ],
+    "expected_decision": "re_kyc",
+    "expected_citations": [
+      "para 23 Explanation 1"
+    ],
+    "why": "R3+R5: Aadhaar number visible in full; PIN has only 5 digits",
+    "tags": [
+      "unlabelled",
+      "no_titles",
+      "unmasked_aadhaar"
+    ]
+  },
+  {
+    "id": "case-22",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10022\nRisk category: Medium\nLast KYC date: 12-01-2022\n\n[Document 1: Aadhaar card]\nGovernment of India\nTest Customer\nDOB: 01/01/1990\nMALE\nXXXX XXXX 0001\nAddress: 1 Anna Salai, Chennai, Tamil Nadu\n600002\n\n[Document 2: PAN card]\nINCOME TAX DEPARTMENT\nPermanent Account Number Card\nZZZPT0001Z\nTEST CUSTOMER\n01/01/1990\n",
+    "expected_fields": {
+      "name": "TEST CUSTOMER",
+      "dob": "01-01-1990",
+      "pan": "ZZZPT0001Z",
+      "form60": false,
+      "aadhaar": "XXXX-XXXX-0001",
+      "address": "1 Anna Salai, Chennai, Tamil Nadu",
+      "pincode": "600002",
+      "doc_type": "aadhaar",
+      "risk_category": "medium",
+      "last_kyc_date": "12-01-2022"
+    },
+    "expected_errors": [],
+    "expected_decision": "escalate",
+    "expected_citations": [
+      "para 17(1)"
+    ],
+    "why": "R6: 'Test Customer' is a fictitious name, so the account looks anonymous or benami",
+    "tags": [
+      "unlabelled"
+    ]
+  },
+  {
+    "id": "case-23",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10023\nRisk category: Low\nLast KYC date: 04-04-2020\n\n[Document 1: Voter ID card]\nELECTION COMMISSION OF INDIA\nEPIC No: MHX0000001\nElector's Name: XYZ\nFather's Name: ABC\nDate of Birth: 01-01-1980\nAddress: 5 Fort, Mumbai, Maharashtra\nPIN Code: 400001\n\n[Document 2: PAN card]\nPermanent Account Number: ZYXPX9999Y\nName: XYZ\nDate of Birth: 01-01-1980\n",
+    "expected_fields": {
+      "name": "XYZ",
+      "dob": "01-01-1980",
+      "pan": "ZYXPX9999Y",
+      "form60": false,
+      "aadhaar": null,
+      "address": "5 Fort, Mumbai, Maharashtra",
+      "pincode": "400001",
+      "doc_type": "voter_id",
+      "risk_category": "low",
+      "last_kyc_date": "04-04-2020"
+    },
+    "expected_errors": [],
+    "expected_decision": "escalate",
+    "expected_citations": [
+      "para 17(1)"
+    ],
+    "why": "R6: 'XYZ' is a placeholder, not a real name",
+    "tags": []
+  },
+  {
+    "id": "case-24",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10024\nRisk category: High\nLast KYC date: 01-04-2026\n\n[Document 1: Passport]\nREPUBLIC OF INDIA\nPassport No: U3300871\nName: ANJALI MEHRA\nDate of birth: 12/02/1987\nPlace of birth: GURUGRAM\nAddress: 9 Sector 14, Gurugram, Haryana\nPIN: 122001\n\n[Document 2: PAN card]\nINCOME TAX DEPARTMENT\nPermanent Account Number Card\nVXKPM3321S\nANJALI MALHOTRA\n12/02/1987\n",
+    "expected_fields": {
+      "name": "ANJALI MEHRA",
+      "dob": "12-02-1987",
+      "pan": "VXKPM3321S",
+      "form60": false,
+      "aadhaar": null,
+      "address": "9 Sector 14, Gurugram, Haryana",
+      "pincode": "122001",
+      "doc_type": "passport",
+      "risk_category": "high",
+      "last_kyc_date": "01-04-2026"
+    },
+    "expected_errors": [],
+    "expected_decision": "escalate",
+    "expected_citations": [
+      "para 17(2)"
+    ],
+    "why": "R7: the passport says Anjali Mehra but the PAN card says Anjali Malhotra; CDD cannot be completed",
+    "tags": [
+      "unlabelled"
+    ]
+  },
+  {
+    "id": "case-25",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10025\nRisk category: Medium\nLast KYC date: 23-06-2024\n\n[Document 1: Aadhaar card]\nGovernment of India\nUnique Identification Authority of India\nJoseph Thomas Kurian\nDOB: 05/03/1988\nMALE\nXXXX XXXX 9134\nAddress: 40 Panampilly Nagar, Kochi, Kerala\n682036\n\n[Document 2: PAN card]\nINCOME TAX DEPARTMENT\nPermanent Account Number Card\nWLJPKI204T\nJOSEPH THOMAS KURIAN\n05/03/1986\n",
+    "expected_fields": {
+      "name": "JOSEPH THOMAS KURIAN",
+      "dob": "05-03-1988",
+      "pan": "WLJPK1204T",
+      "form60": false,
+      "aadhaar": "XXXX-XXXX-9134",
+      "address": "40 Panampilly Nagar, Kochi, Kerala",
+      "pincode": "682036",
+      "doc_type": "aadhaar",
+      "risk_category": "medium",
+      "last_kyc_date": "23-06-2024"
+    },
+    "expected_errors": [],
+    "expected_decision": "escalate",
+    "expected_citations": [
+      "para 17(2)"
+    ],
+    "why": "R7: date of birth is 1988 on the Aadhaar card and 1986 on the PAN card (PAN OCR 'I' is '1'); CDD cannot be completed",
+    "tags": [
+      "unlabelled",
+      "ocr_noise"
+    ]
+  },
+  {
+    "id": "case-26",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10026\nRisk category: Medium\nLast KYC date: 02-05-2021\n\n[Document 1: Electricity bill]\nUTTARAKHAND POWER CORPORATION LTD\nConsumer No: UK-3321-9087\nName: Devendra Rawat\nService address: 16 Rajpur Road, Dehradun, Uttarakhand\nPIN: 248001\nBill date: 11-08-2026\n\n[Branch note dated 12-09-2026]\nCustomer visited the branch for periodic KYC updation. Customer refused to provide any officially valid document, PAN or Form 60, and left without completing the review.\n",
+    "expected_fields": {
+      "name": "DEVENDRA RAWAT",
+      "dob": null,
+      "pan": null,
+      "form60": false,
+      "aadhaar": null,
+      "address": "16 Rajpur Road, Dehradun, Uttarakhand",
+      "pincode": "248001",
+      "doc_type": "utility_bill",
+      "risk_category": "medium",
+      "last_kyc_date": "02-05-2021"
+    },
+    "expected_errors": [],
+    "expected_decision": "escalate",
+    "expected_citations": [
+      "para 5(1)(xiv)",
+      "para 23(3)",
+      "para 23(5)",
+      "para 17(2)"
+    ],
+    "why": "R1+R2+R7: only an electricity bill on file (address proof, not an OVD); no PAN or Form 60; the customer refused to give documents",
+    "tags": []
+  },
+  {
+    "id": "case-27",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10027\nRisk category: Low\nLast KYC date: 10-10-2022\n\n[Document 1: Aadhaar card]\nGovernment of India\nUnique Identification Authority of India\nAyesha Begum\nDOB: 14/05/2012\nFEMALE\nXXXX XXXX 2468\nAddress: 2-1-77 Nampally, Hyderabad, Telangana\n500001\n\n[Document 2: Form No. 60]\nFORM NO. 60\nDeclaration to be made by a person who does not have a Permanent Account Number\nName: Ayesha Begum\nDate of birth: 14-05-2012\nSigned by guardian Salma Begum on 10-10-2022.\n",
+    "expected_fields": {
+      "name": "AYESHA BEGUM",
+      "dob": "14-05-2012",
+      "pan": null,
+      "form60": true,
+      "aadhaar": "XXXX-XXXX-2468",
+      "address": "2-1-77 Nampally, Hyderabad, Telangana",
+      "pincode": "500001",
+      "doc_type": "aadhaar",
+      "risk_category": "low",
+      "last_kyc_date": "10-10-2022"
+    },
+    "expected_errors": [
+      "Date of birth invalid or applicant under 18"
+    ],
+    "expected_decision": "escalate",
+    "expected_citations": [],
+    "why": "R8: born 14-05-2012, so 14 years old on 30-10-2026; a minor cannot be a borrower (Form 60 instead of PAN is fine)",
+    "tags": [
+      "unlabelled"
+    ]
+  },
+  {
+    "id": "case-28",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10028\nRisk category: Medium\nLast KYC date: 15-01-2024\n\n[Document 1: Passport]\nREPUBLIC OF INDIA\nPassport No: V7781120\nName: ISHAAN VERMA\nDate of birth: 22/03/2013\nPlace of birth: INDORE\nAddress: 101 Vijay Nagar, Indore, Madhya Pradesh\nPIN: 452010\n\n[Document 2: PAN card]\nPermanent Account Number: XYRPV1120B\nName: ISHAAN VERMA\nDate of Birth: 22-03-2013\n",
+    "expected_fields": {
+      "name": "ISHAAN VERMA",
+      "dob": "22-03-2013",
+      "pan": "XYRPV1120B",
+      "form60": false,
+      "aadhaar": null,
+      "address": "101 Vijay Nagar, Indore, Madhya Pradesh",
+      "pincode": "452010",
+      "doc_type": "passport",
+      "risk_category": "medium",
+      "last_kyc_date": "15-01-2024"
+    },
+    "expected_errors": [
+      "Date of birth invalid or applicant under 18"
+    ],
+    "expected_decision": "escalate",
+    "expected_citations": [],
+    "why": "R8: born 22-03-2013, so 13 years old on 30-10-2026; a minor cannot be a borrower",
+    "tags": []
+  },
+  {
+    "id": "case-29",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10029\nRisk category: High\nLast KYC date: 09-09-2022\n\n[Document 1: Driving Licence]\nGUJARAT STATE MOTOR DRIVING LICENCE\nDL No: GJ05 20120011223\nName: DEMO USER\nDate of Birth: 10-10-1985\nAddress: 77 Ring Road, Surat, Gujarat\nPIN: 395002\nValid till: 09-10-2035\n\n[Document 2: PAN card]\nPermanent Account Number: DDDPU0000D\nName: DEMO USER\nDate of Birth: 10-10-1985\n",
+    "expected_fields": {
+      "name": "DEMO USER",
+      "dob": "10-10-1985",
+      "pan": "DDDPU0000D",
+      "form60": false,
+      "aadhaar": null,
+      "address": "77 Ring Road, Surat, Gujarat",
+      "pincode": "395002",
+      "doc_type": "driving_licence",
+      "risk_category": "high",
+      "last_kyc_date": "09-09-2022"
+    },
+    "expected_errors": [],
+    "expected_decision": "escalate",
+    "expected_citations": [
+      "para 42(1)",
+      "para 17(1)"
+    ],
+    "why": "R4+R6: high-risk file last updated 09-09-2022, the 2-year limit passed on 09-09-2024; and 'Demo User' is a fictitious name",
+    "tags": []
+  },
+  {
+    "id": "case-30",
+    "raw_document": "KYC RECORD - PERIODIC REVIEW\nCustomer ID: NB-10030\nRisk category: Medium\nLast KYC date: 14-04-2023\n\n[Document 1: Aadhaar card]\nGovernment of India\nUnique Identification Authority of India\nBhavana Reddy\nDOB: 30/04/1990\nFEMALE\n9999 3344 5565\nAddress: 15 Dwaraka Nagar, Visakhapatnam, Andhra Pradesh\n530016\n\n[Document 2: PAN card]\nINCOME TAX DEPARTMENT\nPermanent Account Number Card\nYKAPR2277M\nBHAVANA RAO\n30/04/1990\n",
+    "expected_fields": {
+      "name": "BHAVANA REDDY",
+      "dob": "30-04-1990",
+      "pan": "YKAPR2277M",
+      "form60": false,
+      "aadhaar": "9999-3344-5565",
+      "address": "15 Dwaraka Nagar, Visakhapatnam, Andhra Pradesh",
+      "pincode": "530016",
+      "doc_type": "aadhaar",
+      "risk_category": "medium",
+      "last_kyc_date": "14-04-2023"
+    },
+    "expected_errors": [
+      "Aadhaar must be masked as XXXX-XXXX-1234"
+    ],
+    "expected_decision": "escalate",
+    "expected_citations": [
+      "para 23 Explanation 1",
+      "para 17(2)"
+    ],
+    "why": "R3+R7: Aadhaar number visible in full; and the Aadhaar card says Bhavana Reddy but the PAN card says Bhavana Rao",
+    "tags": [
+      "unlabelled",
+      "unmasked_aadhaar"
+    ]
+  }
+]

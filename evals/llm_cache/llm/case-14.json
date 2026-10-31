@@ -1,0 +1,43 @@
+{
+  "case_id": "case-14",
+  "mode": "llm",
+  "model": "gemini-2.5-flash-lite",
+  "decision": "re_kyc",
+  "rbi_citations": [
+    "para 23 Explanation 1"
+  ],
+  "reason": "Aadhaar must be masked as XXXX-XXXX-1234",
+  "rules_verdict": {
+    "decision": "re_kyc",
+    "citations": [
+      "para 23 Explanation 1"
+    ],
+    "reason": "An Aadhaar number is visible in full in the file; it must be redacted",
+    "rules": [
+      "R3"
+    ]
+  },
+  "decide_audit": {
+    "node": "decide",
+    "mode": "llm",
+    "rules_baseline": "re_kyc",
+    "rules_fired": [
+      "R3"
+    ],
+    "model": "gemini-2.5-flash-lite",
+    "dropped_citations": [],
+    "decision": "re_kyc",
+    "citations": [
+      "para 23 Explanation 1"
+    ]
+  },
+  "human_review_audit": {
+    "node": "human_review",
+    "reviewer": "eval-auto",
+    "action": "confirm",
+    "decision_before": "re_kyc",
+    "decision": "re_kyc",
+    "auto": true
+  },
+  "cached_at": "2026-10-31T07:29:08+00:00"
+}

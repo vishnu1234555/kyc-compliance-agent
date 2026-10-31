@@ -1,0 +1,46 @@
+{
+  "case_id": "case-19",
+  "mode": "llm",
+  "model": "gemini-2.5-flash-lite",
+  "decision": "re_kyc",
+  "rbi_citations": [
+    "para 23(5)"
+  ],
+  "reason": "PAN format invalid",
+  "rules_verdict": {
+    "decision": "re_kyc",
+    "citations": [
+      "para 23(5)",
+      "para 42(1)"
+    ],
+    "reason": "The PAN on file is in the wrong format: ABPPK123A; Periodic KYC updation overdue: medium risk, last KYC 11-11-2016, was due 11-11-2024, as of 31-10-2026",
+    "rules": [
+      "R2",
+      "R4"
+    ]
+  },
+  "decide_audit": {
+    "node": "decide",
+    "mode": "llm",
+    "rules_baseline": "re_kyc",
+    "rules_fired": [
+      "R2",
+      "R4"
+    ],
+    "model": "gemini-2.5-flash-lite",
+    "dropped_citations": [],
+    "decision": "re_kyc",
+    "citations": [
+      "para 23(5)"
+    ]
+  },
+  "human_review_audit": {
+    "node": "human_review",
+    "reviewer": "eval-auto",
+    "action": "confirm",
+    "decision_before": "re_kyc",
+    "decision": "re_kyc",
+    "auto": true
+  },
+  "cached_at": "2026-10-31T07:29:36+00:00"
+}

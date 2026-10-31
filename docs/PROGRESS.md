@@ -1,0 +1,344 @@
+# Build progress (branch `claude/kyc-build`)
+
+Started 30-10-2026 from `claude/kyc-evals`. One commit per roadmap item; every commit message
+carries the scorecard before and after. A new session can start from the first item below that
+is not `done`.
+
+| Item | Status | Notes |
+|---|---|---|
+| 1 `extract` | done | regex reader + fine-tuned GLiNER2 model + ported validation/arbitration; extraction 269/279 regex only -> 276/279 with the model |
+| 3 `retrieve_rules` | done | PyPDFLoader -> paragraph splitter (citation metadata) -> Gemini embeddings -> Chroma; findings.py turns errors/fields into queries; all eight POLICY paragraph numbers verified against the official text |
+| 4 `decide` | done | rules_decide baseline (R1-R8 except R6) + Gemini Flash-Lite structured verdict, citations filtered to retrieved paragraphs, approve skips human_review; LLM evals capped by the key's free tier (20 requests/day/model) |
+| 4b agentic `decide` | done (code + 3-case live check); 30-case numbers blocked by quota | tool loop: search_rbi_rules, check_kyc_due, compare_across_documents, submit_verdict; max 5 investigation calls; every call in the audit entry |
+| 5 `human_review` | done | LangGraph interrupt() + checkpointer (memory, or SQLite via CHECKPOINT_DB); evals auto-resume as "eval-auto" and record it |
+| 6 LangSmith | done | tracer attached through run_config with the 12-digit anonymizer; dataset `kyc-compliance-agent-cases` (masked documents) uploaded; experiment `kyc-rules-a3974733` run against it |
+| 7 prove which model runs | done | scorecard header prints the PII model id, the Hugging Face revision actually loaded and the load time; `evals/model_check.py` shows one case with and without the model |
+| 8 fix the threshold leak | done | `evals/split.json` tune/test halves (15/15, unlabelled 9/8); sweep picks on tune (0.30), reports test half 139/140 = 0.9929; default unchanged |
+| 9 resumable LLM evals | done | per-case cache `evals/llm_cache/<mode>/`, clean stop on a daily-quota 429 with the resume command, "partial: N/30" until complete, citation-meaning line per mode |
+| 10 the four decision numbers | partial, quota-bound | rules 27/30; llm partial 23/30 cached; agent 0/30; agent-gold 0/30. Resume commands below; 20 Gemini calls per day on this key |
+| 11 no full Aadhaar in any checkpoint | done | `checkpoints.MaskingSerializer` masks 12-digit runs at serialization for the memory and SQLite savers; test reads the raw SQLite bytes |
+| 12 final docs | done | README final state with one results table (test half before tuned-on-itself), `docs/LEARN.md`, CLAUDE.md roadmap 7-13 |
+| 13 merge | this session | PR from `claude/kyc-build` into `main`, merge commit (history kept) |
+| Docs | done | README.md (graph, how to run, scorecard tables, limits), docs/WALKTHROUGH.md (per node, case 24 states, syntax), CLAUDE.md roadmap |
+
+## Scorecards, one line per commit
+
+| After | Decision | Rules only | Citations | Extraction regex+model | Regex only | Validate on extracted |
+|---|---|---|---|---|---|---|
+| baseline (skeleton) | 0/30 | - | 0.0000 | 0/279 | - | - |
+| item 1 | 0/30 | - | 0.0000 | 276/279 | 269/279 | 30/30 |
+| item 3 | 0/30 | - | 0.9412 | 276/279 | 269/279 | 30/30 |
+| item 4 (llm, 7 fallbacks) | 25/30 | 27/30 | 0.7157 | 276/279 | 269/279 | 30/30 |
+| item 4b, 5, 6 (rules mode) | 27/30 | 27/30 | 0.8529 | 276/279 | 269/279 | 30/30 |
+
+## The four decision numbers (item 10, as of 31-10-2026)
+
+All LLM runs on `gemini-2.5-flash-lite`, temperature 0, thinking off. A mode's number is
+printed only once all 30 cases are cached; until then the scorecard says "partial: N/30".
+
+| Mode | Decision accuracy | Not answered (quota) | Cached | Resume with |
+|---|---|---|---|---|
+| rules (plain code, no LLM) | 27/30 = 0.9000 | - | not cached (free) | `DECIDE_MODE=rules .venv/bin/python evals/run_evals.py` |
+| llm (no tools) | partial: 23/30 | 7 | 23/30 in `evals/llm_cache/llm/` | `DECIDE_MODE=llm .venv/bin/python evals/run_evals.py` |
+| agent (tools) | partial: 0/30 | 30 | 0/30 | `DECIDE_MODE=agent .venv/bin/python evals/run_evals.py` |
+| agent on gold fields | partial: 0/30 | 30 | 0/30 | `DECIDE_MODE=agent EVAL_GOLD_FIELDS=1 .venv/bin/python evals/run_evals.py` |
+
+Each resume run reuses the cache, spends the day's 20 calls on uncached cases in case order,
+stops at the first daily-quota 429, prints "N of 30 done, resume tomorrow with: <command>" and
+exits 0. Expected calendar: llm needs 1 more day; agent and agent-on-gold need 2-4 LLM calls
+per case, so roughly 4-6 days each at 20 calls a day, or one run each with a billed key.
+
+## Blocked in this session (not faked in code)
+
+- **Gemini free tier on this GOOGLE_API_KEY: 20 generateContent requests per day per model.**
+  Found while running item 4's eval: `gemini-2.5-flash` hit `GenerateRequestsPerDayPerProjectPerModel-FreeTier,
+  limit: 20` after the first few cases, and `gemini-2.5-flash-lite` the same after about 22. A
+  30-case eval needs 30 calls (item 4) or roughly 100 (item 4b, 2-4 calls per case), so no
+  single model can finish a run on this key in one day. What was done: the decide node falls
+  back to the plain-code rules verdict when the LLM is out of quota and the scorecard prints how
+  many cases that happened to ("N LLM errors fell back to the rules"); a spent daily quota is
+  not retried. The committed item 4 scorecard is therefore a mix (see that commit). To rerun with
+  a billed key: `GEMINI_MODEL=gemini-2.5-flash .venv/bin/python evals/run_evals.py`.
+
+- **CPU-only torch wheels.** `download.pytorch.org/whl/cpu` answers, but the wheel files
+  redirect to `download-r2.pytorch.org`, which the session's network policy rejects (403 on
+  CONNECT). `requirements.txt` keeps the reference pin `torch==2.5.1+cpu` from the PyTorch
+  index; this session installed `torch==2.5.1` from PyPI instead (same version, CUDA build,
+  runs on CPU). On a normal machine `pip install -r requirements.txt` works as written.
+- **The RBI PDF host.** `rbidocs.rbi.org.in` closes the connection to this session's HTTP
+  client with no response (the CONNECT succeeds, then an empty reply); the master-direction
+  page itself on `rbi.org.in` is reachable. See item 3 for what was done instead.
+
+## Judgment calls so far
+
+- See `evals/POLICY.md` section 8 for the eval-side calls (three Aadhaar check digits, tags).
+
+## Item 1: extract (done)
+
+What was built (`src/kyc_agent/`): `ocr.py` (O->0, I/l->1 inside digit runs), `documents.py`
+(header, document blocks, doc_type/form60 keyword rules), `regex_reader.py` (labelled lines,
+ID sweeps, bare lines on PAN cards), `pii_model.py` (GLiNER2 wrapper, fakes for tests),
+`arbitration.py` (port of the PII project's validation.py), `extraction.py` (merge, first
+document that shows a field, Pydantic schema in `schema.py`), `nodes.extract`, and masking in
+`nodes.validate`. Evals: `tags` per case, per-field table, regex-only column, validate on
+extracted fields, `evals/sweep_threshold.py`.
+
+Findings about the model on this eval set (threshold sweep, 279 fields):
+
+| threshold | 0.20 | 0.30 | 0.40 | 0.50 | 0.70 | 0.90 | 0.99 |
+|---|---|---|---|---|---|---|---|
+| fields right | 275 | 275 | 274 | 274 | 274 | 274 | 272 |
+
+- Default threshold set to 0.30 (`PII_THRESHOLD`). Vishnu's 0.99 came from a sweep over the ID
+  labels; here the Title Case names on Aadhaar cards score 0.34-0.98, and at 0.99 four of them
+  drop out.
+- What the model adds over regex: 7 names, all on unlabelled Aadhaar cards (name 21/30 ->
+  28/30; unlabelled split 8/17 -> 15/17). Nothing on any other field: regex already reads
+  every PAN, Aadhaar, PIN, date and header value, and the model's "Address" label never fires
+  on an address (it fires on name spans, with confidence up to 0.98, which is why Address has
+  the lowest arbitration priority).
+- Still missed with the model: case 13 (`Nusrat Jahan`, the model proposes nothing even at
+  0.2), case 22 (`Test Customer`, the model does not consider it a person name), case 06's
+  address (the NPR letter prints it under "at the address below", no label; the model has no
+  usable Address label).
+- The model often runs a span into the next line (`Lakshmi Narayanan\nDOB`), so model spans
+  are cut at the first line break before arbitration.
+- The checkpoint's tokenizer_config.json was written by transformers 5 (`tokenizer_class:
+  TokenizersBackend`, list-valued `extra_special_tokens`); gliner2 2.0.0 pins transformers 4,
+  which cannot load it. `pii_model.load_gliner2` falls back to loading tokenizer.json as the
+  DeBERTa-v3 fast tokenizer. Worth knowing for the Aadhaar-Final backend too, which uses the
+  same pins.
+- Load time about 5 s on CPU, about 0.2-0.4 s per document block.
+
+Changes to the arbitration port, both documented in the module docstring: a masked Aadhaar is
+valid; a candidate the document labels itself (`trusted`) skips the structure check and wins
+any overlap against a guessed candidate.
+
+## Item 3: retrieve_rules (done)
+
+- `data/rbi_nbfc_kyc_directions_2025_from_html.pdf` + `data/SOURCE.md`: the official PDF host
+  refused the session (see "Blocked"), so the PDF was rendered with LibreOffice from the full
+  text of the Directions on the rbi.org.in master-direction page (paragraphs 1-76, same
+  numbering and wording; Annex I/II not included). `RBI_PDF_PATH` points at it; drop the
+  official PDF in and delete `data/chroma/` to switch.
+- The eight paragraph numbers in POLICY.md were checked against that text: all correct, no
+  label changed (POLICY.md section 1 says so now).
+- `src/kyc_agent/rules_index.py`: `split_by_paragraph` cuts at "N.", "(n)", "(roman)" and
+  numbered "Explanation N:" lines, with the numbers required to increase by one so a stray
+  number inside a sentence does not open a new paragraph; every chunk carries `citation`
+  ("para 42(1)", "para 5(1)(xiv)", "para 23 Explanation 1"). Sub-chunks start with their
+  paragraph's lead sentence (without it, the one-line "(5) the PAN or ... Form No. 60" lost to
+  paragraph 70 "Quoting of PAN"). 430 paragraph chunks, 436 after
+  `RecursiveCharacterTextSplitter` (1500/150) on the long ones.
+- `src/kyc_agent/findings.py` + `rules.py`: what retrieval is driven by. R1 from doc_type, R2
+  from the PAN error or missing PAN/Form 60, R3/R5/R8 from validate's errors, R4 from exact
+  date maths (`rules.kyc_due`, 29 Feb clamps to 28 Feb), R7 from per-document name/dob
+  comparison and a refusal phrase in a branch note, R6 only as a *tentative* hint (placeholder
+  words such as TEST, DEMO, XYZ) that fetches para 17(1) for the LLM and never fires a rule.
+  `extract` now keeps a branch note's text in its document entry for this.
+- `retrieve_rules`: one query per finding (R1 has two), top-`RETRIEVAL_K`=3 chunks kept in
+  `retrieved_rules` for the LLM, the top-1 citation per query goes to `rbi_citations`, in rule
+  order, deduplicated.
+- Gemini embeddings on this key are on the **free tier**: 100 embed requests per minute per
+  model, each text counting as one. The build is paced (25 chunks per batch, 16 s pause, backoff
+  5/15/30/60 s on 429) and takes about 5 minutes; a `BUILD_OK.json` marker makes a half-built
+  index rebuild from scratch. Identical queries are embedded once per process. The first build
+  used `gemini-embedding-2`; the index was rebuilt on `gemini-embedding-001` (same 3072 dims)
+  after the chunk-lead change, to spend a fresh per-model quota bucket, and that is now the
+  default `EMBEDDING_MODEL`.
+- `langchain_community.document_loaders.PyPDFLoader` prints a deprecation warning
+  (langchain-community is being sunset); kept because the roadmap names PyPDFLoader.
+
+## Item 4: decide (done)
+
+- `decide.py`: `rules_decide` (POLICY R1-R8 except R6, from the findings; the baseline and the
+  fallback), `Verdict` (Pydantic: decision, citations, one-line reason), `build_messages`
+  (as-of date, masked fields, validation errors, retrieved paragraphs; never the raw document),
+  `llm_decide` (structured output, temperature 0, backoff on 429/503), and
+  `keep_retrieved_citations` (a citation the LLM makes that was not retrieved is dropped in code).
+- `nodes.decide`: `DECIDE_MODE=llm` (default) or `rules`; the rules verdict is always computed
+  and stored in `rules_verdict`, so one eval run reports both. `graph.py`: conditional edge,
+  approve -> END, otherwise human_review.
+- Model: `GEMINI_MODEL=gemini-2.5-flash-lite` by default, `GEMINI_THINKING_BUDGET=0`.
+  gemini-3.8-flash answered a one-word prompt in 70 s with 77 reasoning tokens and returned 503
+  "high demand" twice during the session; gemini-2.5-flash answered in about 1 s but its free
+  daily quota (20) was gone after the first probes and cases; Flash-Lite has the same cap. The
+  model is one env var away.
+- The eval scorecard now prints the decide-node accuracy and the rules-only accuracy side by
+  side, and names the model.
+- Item 4 scorecard: decide node 25/30, rules only 27/30, citation hit rate 0.7157. Seven cases
+  (23, 25-30) fell back to the rules when Flash-Lite's daily quota ran out; of the 23
+  LLM-decided cases 20 were right. LLM misses: case 08 (adult born 12-12-2006, no validation
+  error, escalated as a minor: age maths the model did on its own; item 4b hands dates to a
+  tool), case 22 (its placeholder name was never extracted, so R6 had nothing to judge), case
+  24 (a name mismatch across documents, invisible without the documents view; item 4b adds the
+  compare tool). Flash-Lite also tends to cite one of two paragraphs for a rule (cases 10, 19,
+  20), which is what pulled the citation hit rate down from 0.94.
+
+## Item 4b: agentic decide (code done; full scorecards blocked by the free-tier quota)
+
+- `agent.py`: Gemini with `bind_tools(..., tool_choice="any")` chooses among
+  `search_rbi_rules(query)` (the item 3 index; whatever it returns becomes citable),
+  `check_kyc_due(risk_category, last_kyc_date)` (exact date maths, `rules.kyc_due`),
+  `compare_across_documents(field)` (every document's value for name/dob/...), and ends with
+  `submit_verdict(decision, citations, reason)`, whose arguments are the structured output.
+  At most 5 investigation calls per case; after that only submit_verdict is allowed. Every
+  call, its arguments and its result (first 400 chars) go into the decide audit entry
+  (`tool_calls`), with `llm_calls` and `budget_exhausted`.
+- Two deterministic guardrails, both visible in the audit: a verdict is not recorded until
+  check_kyc_due and compare_across_documents("name"/"dob") have been called (the model is sent
+  back once; in the first live run Flash-Lite skipped the comparison on case 24 and approved
+  a name mismatch), and an approve carries no citations (the model cited para 42(1) on an
+  approve). Citations are still filtered to retrieved paragraphs in code.
+- `DECIDE_MODE=agent` selects it; `EVAL_CASES=case-01,case-15` runs a subset;
+  `EVAL_GOLD_FIELDS=1` makes validate/retrieve_rules/decide see the expected fields instead of
+  the extracted ones (extract still runs for its per-document values and its score).
+- Live check on 3 cases with `gemini-3.1-flash-lite` (the only bucket with quota left):
+  case 15 re_kyc via check_kyc_due (2 LLM calls, 18.7 s), case 24 approve before the guardrail
+  (the model never compared documents), case 01 approve with a stray para 42(1) citation
+  (now dropped). See the commit for the rerun after the guardrails.
+- **Blocked:** the four 30-case numbers the roadmap asks for (rules baseline, LLM without
+  tools, LLM with tools, LLM with tools on gold fields) need about 30 + 30 + 90 + 90
+  generateContent calls; this key allows 20 per model per day. The rules baseline is in every
+  scorecard (27/30). Commands for a billed key or another day:
+  `DECIDE_MODE=llm .venv/bin/python evals/run_evals.py`,
+  `DECIDE_MODE=agent .venv/bin/python evals/run_evals.py`,
+  `DECIDE_MODE=agent EVAL_GOLD_FIELDS=1 .venv/bin/python evals/run_evals.py`.
+
+## Item 5: human_review (done)
+
+- `nodes.human_review` calls `interrupt(payload)` with the customer id, decision, reason,
+  citations and validation errors. The graph stops; `graph.invoke(Command(resume={...}),
+  config)` continues it. The resume dict carries `reviewer`, `action` (confirm / override),
+  an optional new `decision` and `note`; the node writes an audit entry with the decision
+  before and after and `auto` (True when the evals resumed it).
+- `build_graph()` always compiles a checkpointer: `MemorySaver` by default, `SqliteSaver` when
+  `CHECKPOINT_DB` names a file (a reviewer can resume after a restart; tested with a second
+  graph object on the same database). `run_config(thread_id)` gives every invoke the thread id
+  the checkpointer needs; one thread per KYC file.
+- Eval mode: `run_graph` streams, sees the `__interrupt__` update, and resumes with
+  `{"reviewer": "eval-auto", "action": "confirm", "auto": True}`. The scorecard prints how many
+  cases paused ("paused and auto-resumed by eval-auto in 19/30 cases"); approve never pauses.
+- `main.py` shows the pause payload and resumes with a demo confirm.
+- Former limit, closed by item 11: the snapshot taken after `extract` used to hold the Aadhaar
+  number as printed. Both checkpointers now serialize through `checkpoints.MaskingSerializer`.
+
+## Item 6: LangSmith (done)
+
+- `tracing.py`: when `LANGSMITH_API_KEY` is set, `run_config()` attaches a `LangChainTracer`
+  built on a `Client(anonymizer=...)` whose replacer rewrites every 12-digit run (with or
+  without spaces/hyphens) to `XXXX-XXXX-<last four>` in traced inputs, outputs and errors. The
+  tracer is attached explicitly, never through `LANGSMITH_TRACING=true`, because that switch
+  would start a second, un-anonymised tracer. Checked after the run: the 100 most recent
+  traced runs and the extract-node runs contain no 12-digit number; the R3 cases' numbers
+  appear as XXXX-XXXX-7782 etc.
+- `evals/langsmith_dataset.py`: uploads `evals/cases.json` as dataset `kyc-compliance-agent-cases`
+  and runs `langsmith.evaluate` against it with the same three per-case scores as the local
+  scorecard. SAFETY: the uploaded documents are masked, so the dataset's labels are the policy
+  applied to the masked file (R3 cannot fire on it): cases 14, 20, 21, 30 carry a different
+  expected decision there, with the original kept as `original_decision`. Verified: no 12-digit
+  number in any example. Experiment `kyc-rules-a3974733` (DECIDE_MODE=rules): decision_match
+  0.9000 over 30, citation_hit_rate 0.8333 over the 15 masked-label cases with citations,
+  extraction_accuracy 0.9896.
+- Unit tests never reach LangSmith (the key is blanked in a fixture); run_evals flushes the
+  client at the end and prints the project name.
+
+## Item 7: prove which model runs (done, 31-10-2026)
+
+- `GLiNERReader` records `revision` (the commit sha huggingface_hub resolved, read from the local
+  hub cache with `snapshot_download(local_files_only=True)`; `local:<folder>` for a local path,
+  `unknown` if the cache cannot say) and `load_seconds`; `describe()` puts both in the scorecard
+  header, e.g. `VK1402/AADHAAR_Extractor @ 0.30, revision 7cfbd719a7ce62be4c3898f9e8880d292224d772,
+  loaded in 82.7 s`. The header is printed after the run, when the model has loaded.
+- `evals/model_check.py [case-id]`: case 24 by default, regex only next to regex + model, the
+  file's `name` and every document's name. On case 24 the model's only addition is the PAN
+  card's `ANJALI MALHOTRA`, which is what makes the R7 mismatch visible.
+- The first load today took 82.7 s against 4.8 s yesterday: cold disk cache after the container
+  slept; nothing changed in the code path.
+
+## Item 8: fix the threshold leak (done, 31-10-2026)
+
+- `evals/split.py` + `evals/split.json`: deterministic split, sorted ids within each tag group,
+  alternating halves (unlabelled starts with tune, labelled with test): 15/15 cases, 9 vs 8
+  unlabelled. A test regenerates the split and checks the file and the balance.
+- `evals/sweep_threshold.py` now prints tune / test / all per threshold, chooses on the tune
+  half only (ties go to the higher threshold) and reports the test half at that threshold next
+  to the full-30 best labelled "tuned on itself".
+- Result: tune half best 0.30 (137/139, tie with 0.20) -> test half 139/140 = 0.9929; tuned on
+  itself 0.30 -> 276/279 = 0.9892. **The default PII_THRESHOLD stays 0.30**; nothing changed.
+  Per threshold (all 30): 0.20 276, 0.30 276, 0.40 275, 0.50 275, 0.70 275, 0.90 274, 0.99 272.
+
+## Item 9: resumable LLM evals (done, 31-10-2026)
+
+- `evals/run_evals.py`: `mode_name` (rules / llm / agent / agent-gold), `cache_dir_for`,
+  `read_cached` / `write_cached` (decision, citations, reason, rules verdict, the decide and
+  human_review audit entries, a timestamp; never the extracted fields), `final_from_cache`
+  (extraction live, decision from the file), `extraction_only` (cases after a quota stop),
+  `is_daily_quota`, `run_all` (stops caching and deciding after the first daily-quota 429),
+  `resume_command`. The rules mode is never cached.
+- An answer the model did not give (quota or any error) is not cached and not counted: the
+  scorecard lists those cases under "LLM not answered", prints "partial: N/30" for the
+  decision accuracy and the citation hit rate until all 30 are cached, and "LLM answers cached
+  N/30" for what was reused. A daily-quota stop prints "N of 30 done, resume tomorrow with:
+  <command>" and exits 0. Extraction numbers still cover all 30 cases after a stop.
+- Under the citation number one line says what it measures in that mode (`CITATION_MEANING`).
+
+## Item 10: the four decision numbers (partial, 31-10-2026)
+
+- Runs in order on gemini-2.5-flash-lite: rules (27/30, the item 9 run, unchanged code), llm
+  (first pass answered 23 cases before the 20-per-day cap closed; the cap is enforced loosely
+  near the boundary), agent and agent-on-gold (0 answered: the day's quota was already spent).
+- Found and fixed on the way: the clean stop never fired in the first pass, because the audit
+  keeps only the first 200 characters of Google's error text and the quota id sits further in.
+  `backoff.error_kind` now classifies the full text (daily_quota / transient / error) and the
+  decide audit entry carries it as `llm_error_kind`; the runner stops on that flag. Two more
+  fixes: after a stop, cached cases are still reused (they need no call) and the skipped cases
+  still get extract, validate and the plain-code rules verdict, so "decision, rules only"
+  stays a 30-case number.
+- The three-mode rerun that followed the fix ran before Vishnu's stop message arrived; it made
+  one failing call per mode (all 429, no quota consumed) and its agent scorecards were dropped.
+  The committed llm scorecard is the single proof run afterwards: 23 cached answers reused, one
+  Gemini call on case 20, a daily-quota 429, clean stop and exit 0.
+- Cache audit: all 23 files under `evals/llm_cache/llm/` are genuine model answers (mode llm,
+  model gemini-2.5-flash-lite, no llm_error, no fallback reason); 0 deleted.
+- Scorecards are kept under `evals/scorecards/<mode>.txt` (rules, llm) and will be added for
+  agent and agent-gold when they have run.
+
+## Item 11: no full Aadhaar in any checkpoint (done, 31-10-2026)
+
+- `src/kyc_agent/checkpoints.py`: `mask_data` walks dicts, lists, tuples and sets and rewrites
+  every 12-digit run in strings to `XXXX-XXXX-<last four>` (LangGraph bookkeeping keys such as
+  `id`, `channel_versions`, `versions_seen` and UUID strings are left alone so the graph can
+  still find its checkpoints); `MaskingSerializer` applies it inside `JsonPlusSerializer.dumps_typed`,
+  the one place every checkpoint, pending write and channel blob passes through;
+  `memory_checkpointer()` and `sqlite_checkpointer(path)` build the two savers with it.
+  `graph.default_checkpointer` uses them.
+- The live run is unchanged: extract still hands validate the number as printed (POLICY.md
+  section 4), validate still records "Aadhaar must be masked as XXXX-XXXX-1234" and masks the
+  state. Only what is written to a checkpoint differs.
+- Tests: case 14 (Aadhaar printed in full) through the graph with the SQLite checkpointer, then
+  the raw bytes of the database (and any journal file) are searched for a 12-digit run: none;
+  the run resumes from that file and finishes. The same for the in-memory saver's stores. The
+  README limit is removed.
+- Not covered: a resume from the extract checkpoint after a crash would give validate the
+  masked value, so the R3 error would not be recorded on that resumed run (the audit entry of
+  extract still shows the fields it found). Everything stored is masked, which was the point.
+
+## Item 12: final docs (done, 31-10-2026)
+
+- README rewritten for the final state: the graph, how to run, how to resume the evals, one
+  results table (rules 27/30; llm partial 23/30 with 23 cached; agent and agent-on-gold
+  partial 0/30; extraction on the held-out test half 139/140 listed before the tuned-on-itself
+  276/279; regex only 269/279; citation hit rate 0.8529 in rules mode; validate on extracted
+  30/30), safety, limits. Mechanism words only.
+- `docs/LEARN.md`: every file under `src/kyc_agent/` and `evals/` in reading order, what each
+  does in two lines, which functions call which, and every piece of syntax each file uses, one
+  line each. Built from an AST pass over the files, then written out by hand.
+- CLAUDE.md roadmap: items 7-13 added and marked.
+- The one rules-mode scorecard of this session is in the item 12 commit message.
+
+## Item 13: merge
+
+- A PR from `claude/kyc-build` into `main`, merged with a merge commit (not a squash) so the
+  one-commit-per-item history stays on `main`. Opened and merged at the end of this session;
+  the resume commands above still apply on `main`.

@@ -1,0 +1,46 @@
+============================================================
+🧠 Model Configuration
+============================================================
+Encoder model      : microsoft/deberta-v3-base
+Counting layer     : count_lstm_v2
+Token pooling      : first
+============================================================
+KYC EVALS - 30 cases (PII model: VK1402/AADHAAR_Extractor @ 0.30, revision 7cfbd719a7ce62be4c3898f9e8880d292224d772, loaded in 12.0 s; decide: llm gemini-2.5-flash-lite)
+  decision accuracy       partial: 23/30 cases answered in mode llm; no number until all 30 are cached
+  decision, rules only    27/30 = 0.9000 (plain-code baseline, R1-R8 except R6)
+  LLM answers cached      23/30 reused from evals/llm_cache/llm/ before this run
+  LLM not answered        case-20, case-21, case-23, case-24, case-25, case-29, case-30 (quota or error: not cached, not counted as an LLM answer)
+  human_review            paused and auto-resumed by eval-auto in 17/30 cases (no human in an eval run)
+  citation hit rate       partial: 23/30 cases answered; no number until all 30 are cached
+    measures: share of each case's expected paragraphs found in rbi_citations; rbi_citations are what the LLM returned, kept only if retrieve_rules had fetched that paragraph; an approve has none
+  extraction accuracy     276/279 = 0.9892 (regex + PII model, extract's output before masking)
+  extraction, regex only  269/279 = 0.9642
+  validate accuracy       30/30 = 1.0000 (on expected fields; 1.0 by construction)
+  validate on extracted   30/30 = 1.0000 (validate(extract output) == expected_errors)
+
+Per field, hits/total. lab = 13 cases with every value labelled, unlab = 17 cases tagged unlabelled.
+  field          regex+model                regex only                
+                 all      lab      unlab     all      lab      unlab   
+  name           28/30    13/13    15/17     21/30    13/13    8/17    
+  dob            29/29    12/12    17/17     29/29    12/12    17/17   
+  pan            26/26    11/11    15/15     26/26    11/11    15/15   
+  form60         30/30    13/13    17/17     30/30    13/13    17/17   
+  aadhaar        14/14    4/4      10/10     14/14    4/4      10/10   
+  address        29/30    13/13    16/17     29/30    13/13    16/17   
+  pincode        30/30    13/13    17/17     30/30    13/13    17/17   
+  doc_type       30/30    13/13    17/17     30/30    13/13    17/17   
+  risk_category  30/30    13/13    17/17     30/30    13/13    17/17   
+  last_kyc_date  30/30    13/13    17/17     30/30    13/13    17/17   
+
+Misses: 7 of 30 cases
+  case     decision expected -> got     citations  fields   regex    validate  val(extr)
+  case-05  approve -> 're_kyc'          -          9/9      9/9      ok        ok
+  case-06  approve -> 're_kyc'          -          9/10     8/10     ok        ok
+  case-08  approve -> 'escalate'        -          10/10    10/10    ok        ok
+  case-13  re_kyc -> 're_kyc'           1/1        8/9      8/9      ok        ok
+  case-19  re_kyc -> 're_kyc'           1/2        9/9      9/9      ok        ok
+  case-22  escalate -> 'approve'        0/1        9/10     9/10     ok        ok
+  case-26  escalate -> 're_kyc'         2/4        7/7      7/7      ok        ok
+
+Daily Gemini quota reached: 23 of 30 done, resume tomorrow with: DECIDE_MODE=llm .venv/bin/python evals/run_evals.py
+  traces: LangSmith project kyc-compliance-agent (12-digit numbers masked by the anonymizer)
