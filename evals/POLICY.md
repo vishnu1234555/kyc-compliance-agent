@@ -107,6 +107,11 @@ with the nulls dropped, in validate's own order (pan, aadhaar, pincode, dob). Th
 
 ## 5. The case file
 
+`split.json` fixes a tune half and a test half of 15 cases each, balanced on the `unlabelled`
+tag (9 vs 8), made by the rule in `evals/split.py`. Anything chosen on the eval set, so far the
+PII-model threshold (`evals/sweep_threshold.py`), is chosen on the tune half and reported on the
+test half.
+
 `cases.json` holds 30 cases. Keys per case: `id`, `raw_document`, `expected_fields`,
 `expected_errors`, `expected_decision`, `expected_citations`, `why`, `tags`. `tags` is a list
 drawn from `unlabelled` (17 cases), `ocr_noise` (5), `no_titles` (3) and `unmasked_aadhaar`

@@ -70,6 +70,12 @@ What the PII model adds over regex alone, per field (hits/total, 30 cases; 17 ta
 | address | 29/30 | 29/30 | 0 (its "Address" label never fires on an address) |
 | dob, pan, form60, aadhaar, pincode, doc_type, risk_category, last_kyc_date | all right | all right | 0 |
 
+The PII-model threshold is chosen on a fixed tune half of 15 cases (`evals/split.json`, balanced
+on the `unlabelled` tag) and reported on the other 15: threshold 0.30, test half 139/140 =
+0.9929. The full-30 number above (276/279) is the same threshold tuned on itself. Run
+`evals/sweep_threshold.py` to reproduce; `evals/model_check.py` shows one case with and without
+the model, and the scorecard header names the Hugging Face revision that was loaded.
+
 Still missed with the model: case 13 (`Nusrat Jahan`: no candidate at any threshold), case 22
 (`Test Customer`: not considered a person name), the NPR letter's unlabelled address (case 06).
 

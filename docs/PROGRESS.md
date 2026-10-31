@@ -13,6 +13,7 @@ is not `done`.
 | 5 `human_review` | done | LangGraph interrupt() + checkpointer (memory, or SQLite via CHECKPOINT_DB); evals auto-resume as "eval-auto" and record it |
 | 6 LangSmith | done | tracer attached through run_config with the 12-digit anonymizer; dataset `kyc-compliance-agent-cases` (masked documents) uploaded; experiment `kyc-rules-a3974733` run against it |
 | 7 prove which model runs | done | scorecard header prints the PII model id, the Hugging Face revision actually loaded and the load time; `evals/model_check.py` shows one case with and without the model |
+| 8 fix the threshold leak | done | `evals/split.json` tune/test halves (15/15, unlabelled 9/8); sweep picks on tune (0.30), reports test half 139/140 = 0.9929; default unchanged |
 | Docs | done | README.md (graph, how to run, scorecard tables, limits), docs/WALKTHROUGH.md (per node, case 24 states, syntax), CLAUDE.md roadmap |
 
 ## Scorecards, one line per commit
@@ -234,3 +235,15 @@ any overlap against a guessed candidate.
   card's `ANJALI MALHOTRA`, which is what makes the R7 mismatch visible.
 - The first load today took 82.7 s against 4.8 s yesterday: cold disk cache after the container
   slept; nothing changed in the code path.
+
+## Item 8: fix the threshold leak (done, 31-10-2026)
+
+- `evals/split.py` + `evals/split.json`: deterministic split, sorted ids within each tag group,
+  alternating halves (unlabelled starts with tune, labelled with test): 15/15 cases, 9 vs 8
+  unlabelled. A test regenerates the split and checks the file and the balance.
+- `evals/sweep_threshold.py` now prints tune / test / all per threshold, chooses on the tune
+  half only (ties go to the higher threshold) and reports the test half at that threshold next
+  to the full-30 best labelled "tuned on itself".
+- Result: tune half best 0.30 (137/139, tie with 0.20) -> test half 139/140 = 0.9929; tuned on
+  itself 0.30 -> 276/279 = 0.9892. **The default PII_THRESHOLD stays 0.30**; nothing changed.
+  Per threshold (all 30): 0.20 276, 0.30 276, 0.40 275, 0.50 275, 0.70 275, 0.90 274, 0.99 272.
