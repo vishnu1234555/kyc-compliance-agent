@@ -16,6 +16,7 @@ is not `done`.
 | 8 fix the threshold leak | done | `evals/split.json` tune/test halves (15/15, unlabelled 9/8); sweep picks on tune (0.30), reports test half 139/140 = 0.9929; default unchanged |
 | 9 resumable LLM evals | done | per-case cache `evals/llm_cache/<mode>/`, clean stop on a daily-quota 429 with the resume command, "partial: N/30" until complete, citation-meaning line per mode |
 | 10 the four decision numbers | partial, quota-bound | rules 27/30; llm partial 23/30 cached; agent 0/30; agent-gold 0/30. Resume commands below; 20 Gemini calls per day on this key |
+| 11 no full Aadhaar in any checkpoint | done | `checkpoints.MaskingSerializer` masks 12-digit runs at serialization for the memory and SQLite savers; test reads the raw SQLite bytes |
 | Docs | done | README.md (graph, how to run, scorecard tables, limits), docs/WALKTHROUGH.md (per node, case 24 states, syntax), CLAUDE.md roadmap |
 
 ## Scorecards, one line per commit
@@ -217,10 +218,8 @@ any overlap against a guessed candidate.
   `{"reviewer": "eval-auto", "action": "confirm", "auto": True}`. The scorecard prints how many
   cases paused ("paused and auto-resumed by eval-auto in 19/30 cases"); approve never pauses.
 - `main.py` shows the pause payload and resumes with a demo confirm.
-- Known limit, written up for the README: with a persistent checkpointer the snapshot taken
-  after `extract` holds the Aadhaar number as printed (validate masks it one step later). Keep
-  the in-memory checkpointer, or encrypt the SQLite file / use LangGraph's EncryptedSerializer,
-  before running this with real data.
+- Former limit, closed by item 11: the snapshot taken after `extract` used to hold the Aadhaar
+  number as printed. Both checkpointers now serialize through `checkpoints.MaskingSerializer`.
 
 ## Item 6: LangSmith (done)
 
@@ -302,3 +301,23 @@ any overlap against a guessed candidate.
   model gemini-2.5-flash-lite, no llm_error, no fallback reason); 0 deleted.
 - Scorecards are kept under `evals/scorecards/<mode>.txt` (rules, llm) and will be added for
   agent and agent-gold when they have run.
+
+## Item 11: no full Aadhaar in any checkpoint (done, 31-10-2026)
+
+- `src/kyc_agent/checkpoints.py`: `mask_data` walks dicts, lists, tuples and sets and rewrites
+  every 12-digit run in strings to `XXXX-XXXX-<last four>` (LangGraph bookkeeping keys such as
+  `id`, `channel_versions`, `versions_seen` and UUID strings are left alone so the graph can
+  still find its checkpoints); `MaskingSerializer` applies it inside `JsonPlusSerializer.dumps_typed`,
+  the one place every checkpoint, pending write and channel blob passes through;
+  `memory_checkpointer()` and `sqlite_checkpointer(path)` build the two savers with it.
+  `graph.default_checkpointer` uses them.
+- The live run is unchanged: extract still hands validate the number as printed (POLICY.md
+  section 4), validate still records "Aadhaar must be masked as XXXX-XXXX-1234" and masks the
+  state. Only what is written to a checkpoint differs.
+- Tests: case 14 (Aadhaar printed in full) through the graph with the SQLite checkpointer, then
+  the raw bytes of the database (and any journal file) are searched for a 12-digit run: none;
+  the run resumes from that file and finishes. The same for the in-memory saver's stores. The
+  README limit is removed.
+- Not covered: a resume from the extract checkpoint after a crash would give validate the
+  masked value, so the R3 error would not be recorded on that resumed run (the audit entry of
+  extract still shows the fields it found). Everything stored is masked, which was the point.

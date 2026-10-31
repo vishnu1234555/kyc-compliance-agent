@@ -107,10 +107,12 @@ case 24 `escalate` with `para 17(2)` after `compare_across_documents("name")`; c
 ## Safety
 
 - API keys come from environment variables only and are never logged or written.
-- A full Aadhaar number never leaves the machine: `validate` replaces it in the state with
-  `XXXX-XXXX-<last four>` right after recording the error, the LLM only ever sees masked fields,
-  LangSmith traces pass through an anonymizer, and the dataset upload is masked (its four
-  R3 labels are adjusted accordingly and the originals kept alongside).
+- A full Aadhaar number never leaves the process: `validate` replaces it in the state with
+  `XXXX-XXXX-<last four>` right after recording the error, both checkpointers serialize through
+  a masking serializer (`checkpoints.py`) so no checkpoint on disk or in memory holds it, the
+  LLM only ever sees masked fields, LangSmith traces pass through an anonymizer, and the
+  dataset upload is masked (its four R3 labels are adjusted accordingly and the originals kept
+  alongside).
 - Every node writes one audit entry; agent tool calls, their arguments and results are in it.
 
 ## Known limits
@@ -120,9 +122,6 @@ case 24 `escalate` with `para 17(2)` after `compare_across_documents("name")`; c
 - R6 (fictitious name) depends on the LLM, and on extraction having found the name at all.
 - The PII model was trained on financial IDs: no date-of-birth or PIN label, an "Address"
   label that fires on name spans, Title Case names scored 0.34–0.98 (hence threshold 0.30).
-- With a persistent checkpointer, the snapshot after `extract` holds the Aadhaar number as
-  printed; `validate` masks it one step later. Keep the in-memory checkpointer or encrypt the
-  SQLite file before real data.
 - `data/` holds the Directions rendered from the official rbi.org.in page text, not the official
   PDF (the PDF host refused the build session); Annex I/II are not included. See `data/SOURCE.md`.
 - The documents are synthetic and in a fixed shape; real OCR output will need more parsing

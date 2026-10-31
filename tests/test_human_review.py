@@ -1,10 +1,9 @@
-import sqlite3
-
 import pytest
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Command
 
 from evals.run_evals import fresh_state, run_graph
+from kyc_agent.checkpoints import sqlite_checkpointer
 from kyc_agent.graph import build_graph, run_config
 
 CLEAN = ("KYC RECORD\nCustomer ID: NB-1\nRisk category: Medium\nLast KYC date: 14-02-2022\n\n[Document 1: Passport]\nName: A B\n"
@@ -47,7 +46,7 @@ def test_eval_runner_auto_resumes_and_records_it() -> None:
 
 def test_sqlite_checkpointer_survives_a_new_graph_object(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     db = tmp_path / "checkpoints.sqlite"
-    saver = SqliteSaver(sqlite3.connect(str(db), check_same_thread=False))
+    saver = sqlite_checkpointer(str(db))
     config = run_config("file-3")
     build_graph(saver).invoke(fresh_state(BILL), config=config)
     # a second process, later: same database, new graph object, resume

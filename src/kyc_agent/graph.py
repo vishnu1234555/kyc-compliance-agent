@@ -2,20 +2,20 @@
 
 A checkpointer is always compiled in, because human_review pauses with interrupt() and the
 graph must be able to pick the file up again. In memory by default; set CHECKPOINT_DB to a
-SQLite path to survive a restart. Every invoke needs a thread id (run_config gives one).
+SQLite path to survive a restart. Either way the checkpoint data is masked (checkpoints.py).
+Every invoke needs a thread id (run_config gives one).
 """
 
 import logging
-import sqlite3
 import uuid
 from typing import Any
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
 from kyc_agent import nodes
+from kyc_agent.checkpoints import memory_checkpointer, sqlite_checkpointer
 from kyc_agent.config import get_settings
 from kyc_agent.state import KYCState
 from kyc_agent.tracing import tracing_callbacks
@@ -24,14 +24,10 @@ logger = logging.getLogger(__name__)
 
 
 def default_checkpointer() -> BaseCheckpointSaver:
-    """SQLite when CHECKPOINT_DB is set (a reviewer can resume after a restart), else in memory."""
+    """SQLite when CHECKPOINT_DB is set (a reviewer can resume after a restart), else in memory.
+    Both go through checkpoints.MaskingSerializer, so no checkpoint holds a full Aadhaar number."""
     path = get_settings().checkpoint_db
-    if path:
-        from langgraph.checkpoint.sqlite import SqliteSaver
-
-        logger.info("checkpoints in %s", path)
-        return SqliteSaver(sqlite3.connect(path, check_same_thread=False))
-    return MemorySaver()
+    return sqlite_checkpointer(path) if path else memory_checkpointer()
 
 
 def build_graph(checkpointer: BaseCheckpointSaver | None = None) -> CompiledStateGraph:
