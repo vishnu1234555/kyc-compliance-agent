@@ -17,6 +17,8 @@ Only the evals load the real model. Tests use FakeReader or NullReader.
 """
 
 import logging
+import os
+import time
 from functools import lru_cache
 from typing import Any, Protocol
 
@@ -39,6 +41,9 @@ class PIIReader(Protocol):
     def read(self, text: str) -> list[Candidate]:
         """Candidates with offsets into `text`."""
 
+    def describe(self) -> str:
+        """One line for the scorecard header."""
+
 
 class NullReader:
     """The model switched off: regex only."""
@@ -48,6 +53,9 @@ class NullReader:
     def read(self, text: str) -> list[Candidate]:
         return []
 
+    def describe(self) -> str:
+        return "off (regex only)"
+
 
 class FakeReader:
     """For tests: reports the (label, value, confidence) triples it was given, where they occur in the text."""
@@ -56,6 +64,9 @@ class FakeReader:
 
     def __init__(self, spans: list[tuple[str, str, float]]) -> None:
         self.spans = spans
+
+    def describe(self) -> str:
+        return "fake"
 
     def read(self, text: str) -> list[Candidate]:
         return [cand for label, value, confidence in self.spans for cand in locate(text, label, value, confidence)]
@@ -107,19 +118,37 @@ def parse_model_output(raw: Any, text: str) -> list[Candidate]:
 
 
 class GLiNERReader:
-    """Lazy wrapper: the 800 MB model loads on the first read, on CPU."""
+    """Lazy wrapper: the 800 MB model loads on the first read, on CPU.
+
+    After the first load, `revision` holds the Hugging Face commit sha that was actually loaded
+    (resolved from the local hub cache) and `load_seconds` how long the load took, so the
+    scorecard can say exactly which weights produced its numbers.
+    """
 
     def __init__(self, model_id: str, threshold: float, labels: dict[str, str] | None = None) -> None:
         self.name = model_id
         self.threshold = threshold
         self.labels = labels or LABELS
         self._model: Any = None
+        self.revision: str | None = None
+        self.load_seconds: float | None = None
 
     def _load(self) -> Any:
         if self._model is None:
             logger.info("loading PII model %s", self.name)
+            started = time.perf_counter()
             self._model = load_gliner2(self.name)
+            self.load_seconds = round(time.perf_counter() - started, 1)
+            self.revision = resolve_revision(self.name)
+            logger.info("PII model %s revision %s loaded in %.1f s", self.name, self.revision, self.load_seconds)
         return self._model
+
+    def describe(self) -> str:
+        """For the scorecard header: id, threshold, and once loaded the revision and load time."""
+        text = f"{self.name} @ {self.threshold:.2f}"
+        if self.revision is not None:
+            text += f", revision {self.revision}, loaded in {self.load_seconds} s"
+        return text
 
     def read(self, text: str) -> list[Candidate]:
         raw = self._load().extract_entities(
@@ -128,6 +157,25 @@ class GLiNERReader:
         candidates = parse_model_output(raw, text)
         logger.debug("PII model: %d candidates at threshold %.2f", len(candidates), self.threshold)
         return candidates
+
+
+def resolve_revision(model_id: str) -> str:
+    """The commit sha huggingface_hub resolved for `model_id`, read from the local hub cache.
+
+    A local folder has no hub revision, so it is reported as "local:<folder name>". Anything the
+    cache cannot answer comes back as "unknown" rather than an error: the revision is a label,
+    not a dependency.
+    """
+    if os.path.isdir(model_id):
+        return f"local:{os.path.basename(os.path.normpath(model_id))}"
+    try:
+        from huggingface_hub import snapshot_download
+
+        snapshot = snapshot_download(model_id, local_files_only=True)
+    except Exception as exc:  # not cached, offline, or not a hub id
+        logger.warning("could not resolve the hub revision of %s: %s", model_id, type(exc).__name__)
+        return "unknown"
+    return os.path.basename(os.path.normpath(snapshot))
 
 
 def load_gliner2(model_id: str) -> Any:

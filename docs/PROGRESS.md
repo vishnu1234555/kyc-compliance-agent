@@ -12,6 +12,7 @@ is not `done`.
 | 4b agentic `decide` | done (code + 3-case live check); 30-case numbers blocked by quota | tool loop: search_rbi_rules, check_kyc_due, compare_across_documents, submit_verdict; max 5 investigation calls; every call in the audit entry |
 | 5 `human_review` | done | LangGraph interrupt() + checkpointer (memory, or SQLite via CHECKPOINT_DB); evals auto-resume as "eval-auto" and record it |
 | 6 LangSmith | done | tracer attached through run_config with the 12-digit anonymizer; dataset `kyc-compliance-agent-cases` (masked documents) uploaded; experiment `kyc-rules-a3974733` run against it |
+| 7 prove which model runs | done | scorecard header prints the PII model id, the Hugging Face revision actually loaded and the load time; `evals/model_check.py` shows one case with and without the model |
 | Docs | done | README.md (graph, how to run, scorecard tables, limits), docs/WALKTHROUGH.md (per node, case 24 states, syntax), CLAUDE.md roadmap |
 
 ## Scorecards, one line per commit
@@ -220,3 +221,16 @@ any overlap against a guessed candidate.
   extraction_accuracy 0.9896.
 - Unit tests never reach LangSmith (the key is blanked in a fixture); run_evals flushes the
   client at the end and prints the project name.
+
+## Item 7: prove which model runs (done, 31-10-2026)
+
+- `GLiNERReader` records `revision` (the commit sha huggingface_hub resolved, read from the local
+  hub cache with `snapshot_download(local_files_only=True)`; `local:<folder>` for a local path,
+  `unknown` if the cache cannot say) and `load_seconds`; `describe()` puts both in the scorecard
+  header, e.g. `VK1402/AADHAAR_Extractor @ 0.30, revision 7cfbd719a7ce62be4c3898f9e8880d292224d772,
+  loaded in 82.7 s`. The header is printed after the run, when the model has loaded.
+- `evals/model_check.py [case-id]`: case 24 by default, regex only next to regex + model, the
+  file's `name` and every document's name. On case 24 the model's only addition is the PAN
+  card's `ANJALI MALHOTRA`, which is what makes the R7 mismatch visible.
+- The first load today took 82.7 s against 4.8 s yesterday: cold disk cache after the container
+  slept; nothing changed in the code path.

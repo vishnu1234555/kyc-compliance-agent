@@ -1,5 +1,5 @@
 {
-  "pii_model": "VK1402/AADHAAR_Extractor @ 0.30",
+  "pii_model": "VK1402/AADHAAR_Extractor @ 0.30, revision 7cfbd719a7ce62be4c3898f9e8880d292224d772, loaded in 13.7 s",
   "decide": "rules",
   "cases": 30,
   "decision_accuracy": 0.9,

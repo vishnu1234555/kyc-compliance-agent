@@ -23,7 +23,7 @@ from kyc_agent.config import get_settings
 from kyc_agent.extraction import extract_fields
 from kyc_agent.graph import build_graph, run_config
 from kyc_agent.nodes import validate
-from kyc_agent.pii_model import NullReader
+from kyc_agent.pii_model import NullReader, default_reader
 from kyc_agent.state import KYCState
 from kyc_agent.tracing import langsmith_client
 
@@ -306,7 +306,6 @@ def print_scorecard(summary: dict[str, Any], rows: list[dict[str, Any]], reader:
 def main() -> None:
     logging.basicConfig(level=os.environ.get("LOG_LEVEL", "WARNING"), format="%(levelname)s %(name)s: %(message)s")
     settings = get_settings()
-    reader = f"{settings.pii_model} @ {settings.pii_threshold:.2f}"
     decider = settings.decide_mode if settings.decide_mode == "rules" else f"{settings.decide_mode} {settings.gemini_model}"
     gold_fields = os.environ.get("EVAL_GOLD_FIELDS", "") not in ("", "0", "false")
     if gold_fields:
@@ -315,6 +314,7 @@ def main() -> None:
     graph = build_graph()
     rows = [run_case(graph, case, gold_fields) for case in cases]
     summary = summarise(rows)
+    reader = default_reader().describe()  # after the run, so the revision and load time are known
     print_scorecard(summary, rows, reader, decider)
     LAST_RUN_PATH.write_text(json.dumps({"pii_model": reader, "decide": decider, **summary}, indent=2) + "\n", encoding="utf-8")
     if langsmith_client() is not None:

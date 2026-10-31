@@ -113,3 +113,16 @@ def test_a_date_line_above_the_aadhaar_does_not_swallow_it() -> None:
     file = AADHAAR_FILE.replace("DOB: 06/06/1977\nMALE\n9999 4512 7782", "DOB: 06/06/1977\n9999 4512 7782")
     out = extract_fields(file, NullReader())
     assert out.fields["aadhaar"] == "9999-4512-7782" and out.fields["dob"] == "06-06-1977"
+
+
+def test_reader_descriptions_and_revision_resolution(tmp_path) -> None:
+    from kyc_agent.pii_model import GLiNERReader, resolve_revision
+
+    assert NullReader().describe() == "off (regex only)"
+    assert FakeReader([]).describe() == "fake"
+    reader = GLiNERReader("some/model", 0.3)
+    assert reader.describe() == "some/model @ 0.30"  # nothing loaded yet: no revision, no time
+    reader.revision, reader.load_seconds = "abc123", 4.8
+    assert reader.describe() == "some/model @ 0.30, revision abc123, loaded in 4.8 s"
+    assert resolve_revision(str(tmp_path)) == f"local:{tmp_path.name}"
+    assert resolve_revision("nobody/no-such-model-cached") == "unknown"
