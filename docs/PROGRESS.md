@@ -15,6 +15,7 @@ is not `done`.
 | 7 prove which model runs | done | scorecard header prints the PII model id, the Hugging Face revision actually loaded and the load time; `evals/model_check.py` shows one case with and without the model |
 | 8 fix the threshold leak | done | `evals/split.json` tune/test halves (15/15, unlabelled 9/8); sweep picks on tune (0.30), reports test half 139/140 = 0.9929; default unchanged |
 | 9 resumable LLM evals | done | per-case cache `evals/llm_cache/<mode>/`, clean stop on a daily-quota 429 with the resume command, "partial: N/30" until complete, citation-meaning line per mode |
+| 10 the four decision numbers | partial, quota-bound | rules 27/30; llm partial 23/30 cached; agent 0/30; agent-gold 0/30. Resume commands below; 20 Gemini calls per day on this key |
 | Docs | done | README.md (graph, how to run, scorecard tables, limits), docs/WALKTHROUGH.md (per node, case 24 states, syntax), CLAUDE.md roadmap |
 
 ## Scorecards, one line per commit
@@ -26,6 +27,23 @@ is not `done`.
 | item 3 | 0/30 | - | 0.9412 | 276/279 | 269/279 | 30/30 |
 | item 4 (llm, 7 fallbacks) | 25/30 | 27/30 | 0.7157 | 276/279 | 269/279 | 30/30 |
 | item 4b, 5, 6 (rules mode) | 27/30 | 27/30 | 0.8529 | 276/279 | 269/279 | 30/30 |
+
+## The four decision numbers (item 10, as of 31-10-2026)
+
+All LLM runs on `gemini-2.5-flash-lite`, temperature 0, thinking off. A mode's number is
+printed only once all 30 cases are cached; until then the scorecard says "partial: N/30".
+
+| Mode | Decision accuracy | Not answered (quota) | Cached | Resume with |
+|---|---|---|---|---|
+| rules (plain code, no LLM) | 27/30 = 0.9000 | - | not cached (free) | `DECIDE_MODE=rules .venv/bin/python evals/run_evals.py` |
+| llm (no tools) | partial: 23/30 | 7 | 23/30 in `evals/llm_cache/llm/` | `DECIDE_MODE=llm .venv/bin/python evals/run_evals.py` |
+| agent (tools) | partial: 0/30 | 30 | 0/30 | `DECIDE_MODE=agent .venv/bin/python evals/run_evals.py` |
+| agent on gold fields | partial: 0/30 | 30 | 0/30 | `DECIDE_MODE=agent EVAL_GOLD_FIELDS=1 .venv/bin/python evals/run_evals.py` |
+
+Each resume run reuses the cache, spends the day's 20 calls on uncached cases in case order,
+stops at the first daily-quota 429, prints "N of 30 done, resume tomorrow with: <command>" and
+exits 0. Expected calendar: llm needs 1 more day; agent and agent-on-gold need 2-4 LLM calls
+per case, so roughly 4-6 days each at 20 calls a day, or one run each with a billed key.
 
 ## Blocked in this session (not faked in code)
 
@@ -263,3 +281,24 @@ any overlap against a guessed candidate.
   N/30" for what was reused. A daily-quota stop prints "N of 30 done, resume tomorrow with:
   <command>" and exits 0. Extraction numbers still cover all 30 cases after a stop.
 - Under the citation number one line says what it measures in that mode (`CITATION_MEANING`).
+
+## Item 10: the four decision numbers (partial, 31-10-2026)
+
+- Runs in order on gemini-2.5-flash-lite: rules (27/30, the item 9 run, unchanged code), llm
+  (first pass answered 23 cases before the 20-per-day cap closed; the cap is enforced loosely
+  near the boundary), agent and agent-on-gold (0 answered: the day's quota was already spent).
+- Found and fixed on the way: the clean stop never fired in the first pass, because the audit
+  keeps only the first 200 characters of Google's error text and the quota id sits further in.
+  `backoff.error_kind` now classifies the full text (daily_quota / transient / error) and the
+  decide audit entry carries it as `llm_error_kind`; the runner stops on that flag. Two more
+  fixes: after a stop, cached cases are still reused (they need no call) and the skipped cases
+  still get extract, validate and the plain-code rules verdict, so "decision, rules only"
+  stays a 30-case number.
+- The three-mode rerun that followed the fix ran before Vishnu's stop message arrived; it made
+  one failing call per mode (all 429, no quota consumed) and its agent scorecards were dropped.
+  The committed llm scorecard is the single proof run afterwards: 23 cached answers reused, one
+  Gemini call on case 20, a daily-quota 429, clean stop and exit 0.
+- Cache audit: all 23 files under `evals/llm_cache/llm/` are genuine model answers (mode llm,
+  model gemini-2.5-flash-lite, no llm_error, no fallback reason); 0 deleted.
+- Scorecards are kept under `evals/scorecards/<mode>.txt` (rules, llm) and will be added for
+  agent and agent-gold when they have run.

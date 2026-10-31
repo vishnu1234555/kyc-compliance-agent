@@ -1,0 +1,26 @@
+{
+  "case_id": "case-09",
+  "mode": "llm",
+  "model": "gemini-2.5-flash-lite",
+  "decision": "approve",
+  "rbi_citations": [],
+  "reason": "nothing fired",
+  "rules_verdict": {
+    "decision": "approve",
+    "citations": [],
+    "reason": "Nothing fires: OVD on file, PAN or Form 60 present, Aadhaar masked, KYC up to date",
+    "rules": []
+  },
+  "decide_audit": {
+    "node": "decide",
+    "mode": "llm",
+    "rules_baseline": "approve",
+    "rules_fired": [],
+    "model": "gemini-2.5-flash-lite",
+    "dropped_citations": [],
+    "decision": "approve",
+    "citations": []
+  },
+  "human_review_audit": null,
+  "cached_at": "2026-10-31T07:28:59+00:00"
+}

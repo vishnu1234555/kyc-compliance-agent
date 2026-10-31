@@ -1,0 +1,33 @@
+{
+  "case_id": "case-08",
+  "mode": "llm",
+  "model": "gemini-2.5-flash-lite",
+  "decision": "escalate",
+  "rbi_citations": [],
+  "reason": "the customer is under 18 (validation error \"Date of birth invalid or applicant under 18\")",
+  "rules_verdict": {
+    "decision": "approve",
+    "citations": [],
+    "reason": "Nothing fires: OVD on file, PAN or Form 60 present, Aadhaar masked, KYC up to date",
+    "rules": []
+  },
+  "decide_audit": {
+    "node": "decide",
+    "mode": "llm",
+    "rules_baseline": "approve",
+    "rules_fired": [],
+    "model": "gemini-2.5-flash-lite",
+    "dropped_citations": [],
+    "decision": "escalate",
+    "citations": []
+  },
+  "human_review_audit": {
+    "node": "human_review",
+    "reviewer": "eval-auto",
+    "action": "confirm",
+    "decision_before": "escalate",
+    "decision": "escalate",
+    "auto": true
+  },
+  "cached_at": "2026-10-31T07:28:06+00:00"
+}

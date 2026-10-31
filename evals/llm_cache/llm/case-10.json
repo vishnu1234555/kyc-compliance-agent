@@ -1,0 +1,46 @@
+{
+  "case_id": "case-10",
+  "mode": "llm",
+  "model": "gemini-2.5-flash-lite",
+  "decision": "re_kyc",
+  "rbi_citations": [
+    "para 5(1)(xiv)",
+    "para 23(3)"
+  ],
+  "reason": "no officially valid document (OVD) on file",
+  "rules_verdict": {
+    "decision": "re_kyc",
+    "citations": [
+      "para 5(1)(xiv)",
+      "para 23(3)"
+    ],
+    "reason": "The identity document is a utility bill, which proves address only; no OVD on file",
+    "rules": [
+      "R1"
+    ]
+  },
+  "decide_audit": {
+    "node": "decide",
+    "mode": "llm",
+    "rules_baseline": "re_kyc",
+    "rules_fired": [
+      "R1"
+    ],
+    "model": "gemini-2.5-flash-lite",
+    "dropped_citations": [],
+    "decision": "re_kyc",
+    "citations": [
+      "para 5(1)(xiv)",
+      "para 23(3)"
+    ]
+  },
+  "human_review_audit": {
+    "node": "human_review",
+    "reviewer": "eval-auto",
+    "action": "confirm",
+    "decision_before": "re_kyc",
+    "decision": "re_kyc",
+    "auto": true
+  },
+  "cached_at": "2026-10-31T07:29:03+00:00"
+}

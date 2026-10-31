@@ -85,12 +85,24 @@ Still missed with the model: case 13 (`Nusrat Jahan`: no candidate at any thresh
 (`Test Customer`: not considered a person name), the NPR letter's unlabelled address (case 06).
 
 The rules baseline misses exactly the three R6 cases (22, 23, 29): a fictitious-looking name
-needs judgment, so the baseline never fires R6. Agent mode, live check on three cases with
-`gemini-3.1-flash-lite`: case 15 `re_kyc` via `check_kyc_due`; case 24 `escalate` with
-`para 17(2)` after `compare_across_documents("name")`; case 01 `approve` with no citations. The
-full 30-case agent numbers (with and without tools, on extracted and on gold fields) need about
-30 + 90 + 90 Gemini calls; this key's free tier allows 20 per model per day, so they are not in
-the table. The commands are in [`docs/PROGRESS.md`](docs/PROGRESS.md).
+needs judgment, so the baseline never fires R6.
+
+The four decision numbers, all LLM runs on `gemini-2.5-flash-lite` at temperature 0 (as of
+31-10-2026; the key allows 20 Gemini calls per day, so the LLM modes fill up over several days
+through the per-case cache in `evals/llm_cache/`; a mode's number is printed only once all 30
+cases are cached):
+
+| Mode | Decision accuracy | Not answered yet | How the decision is made |
+|---|---|---|---|
+| rules | 27/30 = 0.9000 | - | plain code applies POLICY.md R1-R8 except R6 |
+| llm, no tools | partial: 23/30 | 7 | one structured-output call on masked fields, errors and retrieved paragraphs |
+| agent, tools | partial: 0/30 | 30 | the model calls check_kyc_due, compare_across_documents, search_rbi_rules, then submit_verdict |
+| agent on gold fields | partial: 0/30 | 30 | as agent, with the expected fields in place of the extracted ones |
+
+Resume commands are in [`docs/PROGRESS.md`](docs/PROGRESS.md). Agent mode was checked live on
+three cases with `gemini-3.1-flash-lite` on 30-10-2026: case 15 `re_kyc` via `check_kyc_due`;
+case 24 `escalate` with `para 17(2)` after `compare_across_documents("name")`; case 01
+`approve` with no citations.
 
 ## Safety
 

@@ -1,0 +1,33 @@
+{
+  "case_id": "case-05",
+  "mode": "llm",
+  "model": "gemini-2.5-flash-lite",
+  "decision": "re_kyc",
+  "rbi_citations": [],
+  "reason": "no officially valid document (OVD) on file",
+  "rules_verdict": {
+    "decision": "approve",
+    "citations": [],
+    "reason": "Nothing fires: OVD on file, PAN or Form 60 present, Aadhaar masked, KYC up to date",
+    "rules": []
+  },
+  "decide_audit": {
+    "node": "decide",
+    "mode": "llm",
+    "rules_baseline": "approve",
+    "rules_fired": [],
+    "model": "gemini-2.5-flash-lite",
+    "dropped_citations": [],
+    "decision": "re_kyc",
+    "citations": []
+  },
+  "human_review_audit": {
+    "node": "human_review",
+    "reviewer": "eval-auto",
+    "action": "confirm",
+    "decision_before": "re_kyc",
+    "decision": "re_kyc",
+    "auto": true
+  },
+  "cached_at": "2026-10-31T07:28:02+00:00"
+}

@@ -113,3 +113,11 @@ def test_with_backoff_retries_rate_limits_only(monkeypatch: pytest.MonkeyPatch) 
     assert waits == [5, 15]
     with pytest.raises(ValueError):
         rules_index.with_backoff(lambda: (_ for _ in ()).throw(ValueError("bad input")), what="test")
+
+
+def test_error_kind_classifies_quota_rate_limit_and_errors() -> None:
+    from kyc_agent.backoff import error_kind
+
+    assert error_kind(RuntimeError("429 ... GenerateRequestsPerDayPerProjectPerModel-FreeTier")) == "daily_quota"
+    assert error_kind(RuntimeError("429 RESOURCE_EXHAUSTED per minute")) == "transient"
+    assert error_kind(ValueError("bad input")) == "error"

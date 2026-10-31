@@ -21,6 +21,7 @@ from langgraph.types import Command
 
 from kyc_agent import nodes
 from kyc_agent.config import get_settings
+from kyc_agent.decide import rules_decide
 from kyc_agent.extraction import extract_fields
 from kyc_agent.graph import build_graph, run_config
 from kyc_agent.nodes import validate
@@ -215,13 +216,17 @@ def final_from_cache(case: dict[str, Any], cached: dict[str, Any]) -> tuple[dict
 
 
 def extraction_only(case: dict[str, Any]) -> tuple[dict[str, Any], KYCState]:
-    """For cases left after a quota stop: the deterministic part only, no decision at all."""
+    """For cases left after a quota stop: extract, validate and the plain-code rules verdict (all
+    free), but no LLM decision, so the case counts as not answered."""
     after_extract = nodes.extract(fresh_state(case["raw_document"]))
-    return dict(after_extract["extracted_fields"]), after_extract
+    after_validate = nodes.validate(after_extract)
+    baseline = rules_decide(after_validate)
+    return dict(after_extract["extracted_fields"]), {**after_validate, "rules_verdict": baseline.as_dict()}
 
 
-def is_daily_quota(error: str) -> bool:
-    return "PerDay" in error
+def is_daily_quota(decide_entry: dict[str, Any]) -> bool:
+    """The decide node classifies the failure from the full error text; the stored message is cut short."""
+    return decide_entry.get("llm_error_kind") == "daily_quota" or "PerDay" in str(decide_entry.get("llm_error", ""))
 
 
 def run_on_gold_fields(case: dict[str, Any]) -> tuple[dict[str, Any], KYCState]:
@@ -241,10 +246,10 @@ def run_case(graph: CompiledStateGraph, case: dict[str, Any], gold_fields: bool 
     an answer the LLM did not give (quota, error) is never cached and never counted as its answer."""
     mode = mode_name(get_settings().decide_mode, gold_fields)
     cached = read_cached(cache_dir, case["id"])
-    if skip_decision:
-        extracted, final = extraction_only(case)
-    elif cached:
+    if cached:  # a cached answer needs no LLM call, so it is used even after a quota stop
         extracted, final = final_from_cache(case, cached)
+    elif skip_decision:
+        extracted, final = extraction_only(case)
     else:
         extracted, final = run_on_gold_fields(case) if gold_fields else run_graph(graph, case["raw_document"])
     regex_only = extract_fields(case["raw_document"], NullReader()).fields
@@ -265,7 +270,7 @@ def run_case(graph: CompiledStateGraph, case: dict[str, Any], gold_fields: bool 
         "llm_error": llm_error,
         "answered": answered,
         "cached": cached is not None,
-        "quota_stop": is_daily_quota(llm_error),
+        "quota_stop": is_daily_quota(decide_entry),
         "tool_calls": len([call for call in decide_entry.get("tool_calls", []) if call.get("tool") != "submit_verdict"]),
         "llm_calls": decide_entry.get("llm_calls", 0),
         "auto_reviewed": any(entry.get("node") == "human_review" and entry.get("auto") for entry in final["audit_log"]),

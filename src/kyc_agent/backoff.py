@@ -13,6 +13,14 @@ BACKOFF_SECONDS = (5, 15, 30, 60, 60, 60)
 _TRANSIENT_MARKS = ("429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE", "deadline", "Deadline", "Server disconnected")
 
 
+def error_kind(exc: Exception) -> str:
+    """"daily_quota" (a spent per-day quota: stop), "transient" (rate limit or outage: retry), else "error"."""
+    text = str(exc)
+    if "PerDay" in text:
+        return "daily_quota"
+    return "transient" if is_transient(exc) else "error"
+
+
 def is_transient(exc: Exception) -> bool:
     """Worth retrying: per-minute rate limits and outages. A spent daily quota is not."""
     text = str(exc)

@@ -34,7 +34,8 @@ def test_mode_names_and_resume_command() -> None:
     assert mode_name("llm", False) == "llm" and mode_name("agent", True) == "agent-gold"
     assert cache_dir_for("rules") is None and cache_dir_for("agent-gold").name == "agent-gold"
     assert resume_command("agent", True) == "DECIDE_MODE=agent EVAL_GOLD_FIELDS=1 .venv/bin/python evals/run_evals.py"
-    assert is_daily_quota("429 GenerateRequestsPerDayPerProjectPerModel-FreeTier") and not is_daily_quota("429 per minute")
+    assert is_daily_quota({"llm_error_kind": "daily_quota"}) and is_daily_quota({"llm_error": "429 ...PerDay..."})
+    assert not is_daily_quota({"llm_error": "429 per minute", "llm_error_kind": "transient"})
 
 
 def test_llm_answer_is_cached_and_reused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -56,11 +57,14 @@ def test_llm_answer_is_cached_and_reused(tmp_path: Path, monkeypatch: pytest.Mon
 
 def test_daily_quota_stops_the_run_without_caching_or_counting(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DECIDE_MODE", "llm")
-    monkeypatch.setattr(nodes, "get_chat_model", lambda: FakeChat(RuntimeError("429 RESOURCE_EXHAUSTED GenerateRequestsPerDayPerProjectPerModel-FreeTier")))
+    long_tail = "x" * 300  # the quota id sits far into Google's error text, past the 200-char cut the audit keeps
+    monkeypatch.setattr(nodes, "get_chat_model", lambda: FakeChat(RuntimeError(f"429 RESOURCE_EXHAUSTED {long_tail} GenerateRequestsPerDayPerProjectPerModel-FreeTier")))
     rows, stopped = run_all(build_graph(), [CASE_10, CASE_01], False, tmp_path / "llm")
     assert stopped is True
     assert rows[0]["quota_stop"] and not rows[0]["answered"] and rows[0]["got_decision"] == "re_kyc"  # rules fallback happened, not counted
+    assert "PerDay" not in rows[0]["llm_error"]  # the stored text is cut; the kind flag carried the classification
     assert not rows[1]["answered"] and rows[1]["got_decision"] == "" and rows[1]["fields"][1] > 0  # extraction only
+    assert rows[1]["decision_rules"] == (1, 1)  # the free rules baseline is still scored after the stop
     assert not (tmp_path / "llm").exists()
     summary = summarise(rows)
     assert summary["answered"] == 0 and summary["complete"] is False and summary["decision_accuracy"] is None
@@ -82,3 +86,14 @@ def test_scorecard_prints_partial_and_what_citations_measure(capsys: pytest.Capt
     assert "LLM answers cached      1/2 reused" in out and "LLM not answered        case-10" in out
     assert "citation hit rate       partial: 1/2" in out and "measures: share of each case's expected paragraphs" in out
     assert "re_kyc -> (not answered)" in out
+
+
+def test_cached_answers_are_still_used_after_a_quota_stop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DECIDE_MODE", "llm")
+    monkeypatch.setattr(nodes, "get_chat_model", lambda: FakeChat(Verdict(decision="approve", citations=[], reason="ok")))
+    graph = build_graph()
+    run_case(graph, CASE_01, cache_dir=tmp_path / "llm")  # caches case-01
+    monkeypatch.setattr(nodes, "get_chat_model", lambda: FakeChat(RuntimeError("429 GenerateRequestsPerDayPerProjectPerModel-FreeTier")))
+    rows, stopped = run_all(graph, [CASE_10, CASE_01], False, tmp_path / "llm")
+    assert stopped and not rows[0]["answered"]
+    assert rows[1]["cached"] and rows[1]["answered"] and rows[1]["got_decision"] == "approve"

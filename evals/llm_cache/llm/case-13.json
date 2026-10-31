@@ -1,0 +1,43 @@
+{
+  "case_id": "case-13",
+  "mode": "llm",
+  "model": "gemini-2.5-flash-lite",
+  "decision": "re_kyc",
+  "rbi_citations": [
+    "para 23(5)"
+  ],
+  "reason": "no PAN and no Form 60 (form60 false)",
+  "rules_verdict": {
+    "decision": "re_kyc",
+    "citations": [
+      "para 23(5)"
+    ],
+    "reason": "No PAN and no Form 60 anywhere in the file",
+    "rules": [
+      "R2"
+    ]
+  },
+  "decide_audit": {
+    "node": "decide",
+    "mode": "llm",
+    "rules_baseline": "re_kyc",
+    "rules_fired": [
+      "R2"
+    ],
+    "model": "gemini-2.5-flash-lite",
+    "dropped_citations": [],
+    "decision": "re_kyc",
+    "citations": [
+      "para 23(5)"
+    ]
+  },
+  "human_review_audit": {
+    "node": "human_review",
+    "reviewer": "eval-auto",
+    "action": "confirm",
+    "decision_before": "re_kyc",
+    "decision": "re_kyc",
+    "auto": true
+  },
+  "cached_at": "2026-10-31T07:29:07+00:00"
+}

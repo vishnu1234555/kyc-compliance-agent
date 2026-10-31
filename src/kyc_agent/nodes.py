@@ -5,6 +5,7 @@ from typing import Any
 from langgraph.types import interrupt
 
 from kyc_agent.agent import agent_decide
+from kyc_agent.backoff import error_kind
 from kyc_agent.config import get_settings
 from kyc_agent.decide import Decision, llm_decide, rules_decide
 from kyc_agent.extraction import extract_fields
@@ -138,6 +139,7 @@ def decide(state: KYCState) -> KYCState:
         except Exception as exc:  # the model is unreachable even after backoff: keep the file moving
             logger.error("decide: LLM failed (%s); applying the rules baseline", exc)
             entry["llm_error"] = f"{type(exc).__name__}: {str(exc)[:200]}"
+            entry["llm_error_kind"] = error_kind(exc)  # read from the full text, before the cut above
             verdict = Decision(baseline.decision, baseline.citations,
                                f"LLM unavailable, rules baseline applied: {baseline.reason}", rules=baseline.rules,
                                error=entry["llm_error"])

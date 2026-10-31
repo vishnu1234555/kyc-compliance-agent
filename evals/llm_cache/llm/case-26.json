@@ -1,0 +1,54 @@
+{
+  "case_id": "case-26",
+  "mode": "llm",
+  "model": "gemini-2.5-flash-lite",
+  "decision": "re_kyc",
+  "rbi_citations": [
+    "para 5(1)(xiv)",
+    "para 23(5)"
+  ],
+  "reason": "No Officially Valid Document (OVD) on file, no PAN or Form 60 provided, and periodic KYC is overdue.",
+  "rules_verdict": {
+    "decision": "escalate",
+    "citations": [
+      "para 5(1)(xiv)",
+      "para 23(3)",
+      "para 23(5)",
+      "para 17(2)"
+    ],
+    "reason": "The identity document is a utility bill, which proves address only; no OVD on file; No PAN and no Form 60 anywhere in the file; The name differs between documents in the file (utility_bill: DEVENDRA RAWAT; note: CUSTOMER); CDD cannot be completed; The file records that the customer refused to provide documents; CDD cannot be completed",
+    "rules": [
+      "R1",
+      "R2",
+      "R7"
+    ]
+  },
+  "decide_audit": {
+    "node": "decide",
+    "mode": "llm",
+    "rules_baseline": "escalate",
+    "rules_fired": [
+      "R1",
+      "R2",
+      "R7"
+    ],
+    "model": "gemini-2.5-flash-lite",
+    "dropped_citations": [
+      "para 42(1)"
+    ],
+    "decision": "re_kyc",
+    "citations": [
+      "para 5(1)(xiv)",
+      "para 23(5)"
+    ]
+  },
+  "human_review_audit": {
+    "node": "human_review",
+    "reviewer": "eval-auto",
+    "action": "confirm",
+    "decision_before": "re_kyc",
+    "decision": "re_kyc",
+    "auto": true
+  },
+  "cached_at": "2026-10-31T07:30:12+00:00"
+}
