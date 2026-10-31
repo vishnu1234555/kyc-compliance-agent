@@ -13,6 +13,7 @@ Rules source: RBI/DOR/2025-26/361, dated 28 Nov 2025, updated as on 29 Dec 2025,
 - Secrets via `.env` (see `.env.example`), read through `config.get_settings()`. Keys are never printed, logged or written.
 - A full Aadhaar number never leaves the process: `validate` masks it in the state right after checking it, the LLM sees masked fields only, LangSmith goes through the anonymizer in `tracing.py`, and the dataset upload is masked.
 - Every graph invoke/stream takes `run_config(thread_id)` (checkpointer thread id + tracer). `DECIDE_MODE` is `rules`, `llm` or `agent`.
+- LLM and agent eval answers are cached per case under `evals/llm_cache/<mode>/` (committed); a rerun skips cached cases, a daily-quota 429 stops the run cleanly and prints the resume command, and a mode's decision number is printed only once all 30 cases are cached ("partial: N/30" before that).
 - Unit tests run offline: `tests/conftest.py` swaps in a null PII reader, a fake rules index, `DECIDE_MODE=rules` and a blank LangSmith key. Only `evals/` touches the real model, Gemini and LangSmith.
 - Keep PRs small: one node per PR.
 - RAG work uses LangChain components only (loaders, splitters, `langchain_chroma`). Never raw pypdf or hand-rolled retrieval.

@@ -12,6 +12,7 @@ expected fields (1.0 by construction) and on the extracted fields.
 import json
 import logging
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,16 @@ logger = logging.getLogger("evals")
 EVALS_DIR = Path(__file__).resolve().parent
 CASES_PATH = EVALS_DIR / "cases.json"
 LAST_RUN_PATH = EVALS_DIR / "last_run.json"
+CACHE_ROOT = EVALS_DIR / "llm_cache"  # evals/llm_cache/<mode>/<case_id>.json, committed, so a run can resume
+
+# What "citation hit rate" measures in each mode: the same formula, different rbi_citations.
+CITATION_MEANING = {
+    "rules": "rbi_citations are the POLICY.md table citations of the rules that fired in plain code (R6 never fires there)",
+    "llm": "rbi_citations are what the LLM returned, kept only if retrieve_rules had fetched that paragraph; an approve has none",
+    "agent": "rbi_citations are the agent's submit_verdict citations, kept only if retrieve_rules or its own search_rbi_rules fetched that paragraph; an approve has none",
+    "agent-gold": "as agent mode, with validate/retrieve_rules/decide run on the expected fields instead of the extracted ones",
+    "llm-gold": "as llm mode, with validate/retrieve_rules/decide run on the expected fields instead of the extracted ones",
+}
 
 FIELDS = ("name", "dob", "pan", "form60", "aadhaar", "address", "pincode", "doc_type", "risk_category", "last_kyc_date")
 Score = tuple[int, int]  # (hits, total)
@@ -141,6 +152,78 @@ def run_graph(graph: CompiledStateGraph, raw_document: str, config: dict[str, An
     return extracted, final
 
 
+def mode_name(decide_mode: str, gold_fields: bool) -> str:
+    """rules | llm | agent | llm-gold | agent-gold: the cache folder and the scorecard label."""
+    return decide_mode if decide_mode == "rules" or not gold_fields else f"{decide_mode}-gold"
+
+
+def resume_command(decide_mode: str, gold_fields: bool) -> str:
+    gold = "EVAL_GOLD_FIELDS=1 " if gold_fields else ""
+    return f"DECIDE_MODE={decide_mode} {gold}.venv/bin/python evals/run_evals.py"
+
+
+def cache_dir_for(mode: str) -> Path | None:
+    """LLM and agent answers are cached per case; the rules baseline is free and never cached."""
+    return None if mode == "rules" else CACHE_ROOT / mode
+
+
+def read_cached(cache_dir: Path | None, case_id: str) -> dict[str, Any] | None:
+    if cache_dir is None:
+        return None
+    path = cache_dir / f"{case_id}.json"
+    if not path.exists():
+        return None
+    with path.open(encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def write_cached(cache_dir: Path, case_id: str, mode: str, final: KYCState) -> None:
+    """Only the decision side is cached (never the extracted fields: extraction is cheap and deterministic)."""
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    decide_entry = next(entry for entry in final["audit_log"] if entry.get("node") == "decide")
+    review_entry = next((entry for entry in final["audit_log"] if entry.get("node") == "human_review"), None)
+    record = {
+        "case_id": case_id,
+        "mode": mode,
+        "model": decide_entry.get("model"),
+        "decision": final["decision"],
+        "rbi_citations": final["rbi_citations"],
+        "reason": final.get("reason", ""),
+        "rules_verdict": final.get("rules_verdict", {}),
+        "decide_audit": decide_entry,
+        "human_review_audit": review_entry,
+        "cached_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+    (cache_dir / f"{case_id}.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+
+
+def final_from_cache(case: dict[str, Any], cached: dict[str, Any]) -> tuple[dict[str, Any], KYCState]:
+    """Rebuild what the scorecard needs from a cached answer: extraction live, the decision from the file."""
+    after_extract = nodes.extract(fresh_state(case["raw_document"]))
+    audit = [*after_extract["audit_log"], cached["decide_audit"]]
+    if cached.get("human_review_audit"):
+        audit.append(cached["human_review_audit"])
+    final: KYCState = {
+        **after_extract,
+        "decision": cached["decision"],
+        "rbi_citations": cached["rbi_citations"],
+        "reason": cached.get("reason", ""),
+        "rules_verdict": cached.get("rules_verdict", {}),
+        "audit_log": audit,
+    }
+    return dict(after_extract["extracted_fields"]), final
+
+
+def extraction_only(case: dict[str, Any]) -> tuple[dict[str, Any], KYCState]:
+    """For cases left after a quota stop: the deterministic part only, no decision at all."""
+    after_extract = nodes.extract(fresh_state(case["raw_document"]))
+    return dict(after_extract["extracted_fields"]), after_extract
+
+
+def is_daily_quota(error: str) -> bool:
+    return "PerDay" in error
+
+
 def run_on_gold_fields(case: dict[str, Any]) -> tuple[dict[str, Any], KYCState]:
     """Decide on the expected fields instead of the extracted ones, to separate extraction errors
     from decision errors. extract still runs (for its per-document values and the extraction score);
@@ -152,20 +235,37 @@ def run_on_gold_fields(case: dict[str, Any]) -> tuple[dict[str, Any], KYCState]:
     return extracted, final
 
 
-def run_case(graph: CompiledStateGraph, case: dict[str, Any], gold_fields: bool = False) -> dict[str, Any]:
-    extracted, final = run_on_gold_fields(case) if gold_fields else run_graph(graph, case["raw_document"])
+def run_case(graph: CompiledStateGraph, case: dict[str, Any], gold_fields: bool = False,
+             cache_dir: Path | None = None, skip_decision: bool = False) -> dict[str, Any]:
+    """One case. With a cache_dir, a cached answer is reused and a fresh LLM answer is cached;
+    an answer the LLM did not give (quota, error) is never cached and never counted as its answer."""
+    mode = mode_name(get_settings().decide_mode, gold_fields)
+    cached = read_cached(cache_dir, case["id"])
+    if skip_decision:
+        extracted, final = extraction_only(case)
+    elif cached:
+        extracted, final = final_from_cache(case, cached)
+    else:
+        extracted, final = run_on_gold_fields(case) if gold_fields else run_graph(graph, case["raw_document"])
     regex_only = extract_fields(case["raw_document"], NullReader()).fields
-    logger.info("%s: decision expected %r, got %r", case["id"], case["expected_decision"], final["decision"])
+    logger.info("%s: decision expected %r, got %r%s", case["id"], case["expected_decision"], final.get("decision", ""), " (cached)" if cached else "")
     baseline = final.get("rules_verdict", {}).get("decision", "")
     decide_entry = next((entry for entry in final["audit_log"] if entry.get("node") == "decide"), {})
+    llm_error = str(decide_entry.get("llm_error", ""))
+    answered = bool(decide_entry) and not llm_error
+    if cache_dir is not None and cached is None and answered:
+        write_cached(cache_dir, case["id"], mode, final)
     return {
         "id": case["id"],
         "tags": case.get("tags", []),
         "expected_decision": case["expected_decision"],
-        "got_decision": final["decision"],
-        "decision": score_decision(case["expected_decision"], final["decision"]),
+        "got_decision": final.get("decision", ""),
+        "decision": score_decision(case["expected_decision"], final.get("decision", "")),
         "decision_rules": score_decision(case["expected_decision"], baseline),
-        "llm_error": decide_entry.get("llm_error", ""),
+        "llm_error": llm_error,
+        "answered": answered,
+        "cached": cached is not None,
+        "quota_stop": is_daily_quota(llm_error),
         "tool_calls": len([call for call in decide_entry.get("tool_calls", []) if call.get("tool") != "submit_verdict"]),
         "llm_calls": decide_entry.get("llm_calls", 0),
         "auto_reviewed": any(entry.get("node") == "human_review" and entry.get("auto") for entry in final["audit_log"]),
@@ -204,6 +304,8 @@ def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
     tool_calls = 0
     llm_calls = 0
     auto_reviewed = 0
+    answered = 0
+    cached = 0
     citation_rates: list[float] = []
     fields: Score = (0, 0)
     fields_regex: Score = (0, 0)
@@ -211,14 +313,17 @@ def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
     validate_extracted_hits = 0
     unlabelled = 0
     for row in rows:
-        decision_hits += row["decision"][0]
+        row_answered = row.get("answered", True)
+        answered += 1 if row_answered else 0
+        cached += 1 if row.get("cached") else 0
+        decision_hits += row["decision"][0] if row_answered else 0
         rules_hits += row.get("decision_rules", (0, 1))[0]
         llm_errors += 1 if row.get("llm_error") else 0
         tool_calls += row.get("tool_calls", 0)
         llm_calls += row.get("llm_calls", 0)
         auto_reviewed += 1 if row.get("auto_reviewed") else 0
         hits, total = row["citations"]
-        if total > 0:
+        if total > 0 and row_answered:
             citation_rates.append(hits / total)
         fields = _add(fields, row["fields"])
         fields_regex = _add(fields_regex, row.get("fields_regex", (0, 0)))
@@ -226,9 +331,14 @@ def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
         validate_extracted_hits += row.get("validate_extracted", (0, 1))[0]
         if "unlabelled" in row.get("tags", []):
             unlabelled += 1
+    complete = answered == len(rows)
     return {
         "cases": len(rows),
-        "decision_accuracy": safe_divide(decision_hits, len(rows)),
+        "answered": answered,
+        "cached": cached,
+        "complete": complete,
+        # the decision number is only a number when every case was answered in this mode
+        "decision_accuracy": safe_divide(decision_hits, len(rows)) if complete else None,
         "decision_hits": decision_hits,
         "decision_rules_accuracy": safe_divide(rules_hits, len(rows)),
         "decision_rules_hits": rules_hits,
@@ -236,7 +346,7 @@ def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "tool_calls": tool_calls,
         "llm_calls": llm_calls,
         "auto_reviewed": auto_reviewed,
-        "citation_hit_rate": safe_divide(sum(citation_rates), len(citation_rates)),
+        "citation_hit_rate": safe_divide(sum(citation_rates), len(citation_rates)) if complete else None,
         "citation_cases": len(citation_rates),
         "extraction_accuracy": safe_divide(*fields),
         "extraction_hits": fields[0],
@@ -255,7 +365,8 @@ def summarise(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def has_miss(row: dict[str, Any]) -> bool:
-    for key in ("decision", "citations", "fields", "validate", "validate_extracted"):
+    keys = ("decision", "citations", "fields", "validate", "validate_extracted") if row.get("answered", True) else ("fields", "validate", "validate_extracted")
+    for key in keys:
         hits, total = row.get(key, (0, 0))
         if hits < total:
             return True
@@ -266,20 +377,28 @@ def _ratio(score: Score) -> str:
     return f"{score[0]}/{score[1]}"
 
 
-def print_scorecard(summary: dict[str, Any], rows: list[dict[str, Any]], reader: str, decider: str) -> None:
+def print_scorecard(summary: dict[str, Any], rows: list[dict[str, Any]], reader: str, decider: str, mode: str = "rules") -> None:
     n = summary["cases"]
     print(f"KYC EVALS - {n} cases (PII model: {reader}; decide: {decider})")
-    errors = f", {summary['llm_errors']} LLM errors fell back to the rules" if summary.get("llm_errors") else ""
-    print(f"  decision accuracy       {summary['decision_hits']}/{n} = {summary['decision_accuracy']:.4f} (decide node{errors})")
+    if summary.get("complete", True):
+        print(f"  decision accuracy       {summary['decision_hits']}/{n} = {summary['decision_accuracy']:.4f} (decide node, mode {mode})")
+    else:
+        print(f"  decision accuracy       partial: {summary['answered']}/{n} cases answered in mode {mode}; no number until all {n} are cached")
     print(f"  decision, rules only    {summary['decision_rules_hits']}/{n} = {summary['decision_rules_accuracy']:.4f} (plain-code baseline, R1-R8 except R6)")
-    fallbacks = [row["id"] for row in rows if row.get("llm_error")]
-    if fallbacks:
-        print(f"  LLM fallbacks           {', '.join(fallbacks)}")
+    if mode != "rules":
+        print(f"  LLM answers cached      {summary.get('cached', 0)}/{n} reused from evals/llm_cache/{mode}/ before this run")
+    unanswered = [row["id"] for row in rows if not row.get("answered", True)]
+    if unanswered:
+        print(f"  LLM not answered        {', '.join(unanswered)} (quota or error: not cached, not counted as an LLM answer)")
     if summary.get("tool_calls"):
         print(f"  agent tool calls        {summary['tool_calls']} in total, {summary['tool_calls'] / n:.1f} per case; {summary['llm_calls']} LLM calls")
     if "auto_reviewed" in summary:
         print(f"  human_review            paused and auto-resumed by eval-auto in {summary['auto_reviewed']}/{n} cases (no human in an eval run)")
-    print(f"  citation hit rate       {summary['citation_hit_rate']:.4f} (mean over {summary['citation_cases']} cases with expected citations)")
+    if summary.get("complete", True):
+        print(f"  citation hit rate       {summary['citation_hit_rate']:.4f} (mean over {summary['citation_cases']} cases with expected citations)")
+    else:
+        print(f"  citation hit rate       partial: {summary['answered']}/{n} cases answered; no number until all {n} are cached")
+    print(f"    measures: share of each case's expected paragraphs found in rbi_citations; {CITATION_MEANING.get(mode, mode)}")
     print(f"  extraction accuracy     {summary['extraction_hits']}/{summary['extraction_total']} = {summary['extraction_accuracy']:.4f} (regex + PII model, extract's output before masking)")
     print(f"  extraction, regex only  {summary['extraction_regex_hits']}/{summary['extraction_regex_total']} = {summary['extraction_regex_accuracy']:.4f}")
     print(f"  validate accuracy       {summary['validate_hits']}/{n} = {summary['validate_accuracy']:.4f} (on expected fields; 1.0 by construction)")
@@ -296,11 +415,26 @@ def print_scorecard(summary: dict[str, Any], rows: list[dict[str, Any]], reader:
     if misses:
         print(f"  {'case':<8} {'decision expected -> got':<28} {'citations':<10} {'fields':<8} {'regex':<8} {'validate':<9} val(extr)")
     for row in misses:
-        decision = f"{row['expected_decision']} -> {row['got_decision']!r}"
+        decision = f"{row['expected_decision']} -> {row['got_decision']!r}" if row.get("answered", True) else f"{row['expected_decision']} -> (not answered)"
         citations = "-" if row["citations"][1] == 0 else _ratio(row["citations"])
         validate_ok = "ok" if row["validate"][0] == 1 else "MISS"
         extracted_ok = "ok" if row.get("validate_extracted", (1, 1))[0] == 1 else "MISS"
         print(f"  {row['id']:<8} {decision:<28} {citations:<10} {_ratio(row['fields']):<8} {_ratio(row.get('fields_regex', (0, 0))):<8} {validate_ok:<9} {extracted_ok}")
+
+
+def run_all(graph: CompiledStateGraph, cases: list[dict[str, Any]], gold_fields: bool,
+            cache_dir: Path | None) -> tuple[list[dict[str, Any]], bool]:
+    """Every case in order. After a daily-quota 429 the remaining cases get extraction only, so the
+    extraction numbers still cover all cases while the decision side is reported as partial."""
+    rows: list[dict[str, Any]] = []
+    stopped = False
+    for case in cases:
+        row = run_case(graph, case, gold_fields, cache_dir, skip_decision=stopped)
+        rows.append(row)
+        if row["quota_stop"] and not stopped:
+            stopped = True
+            logger.warning("daily quota reached at %s; the remaining cases get no decision", case["id"])
+    return rows, stopped
 
 
 def main() -> None:
@@ -310,13 +444,17 @@ def main() -> None:
     gold_fields = os.environ.get("EVAL_GOLD_FIELDS", "") not in ("", "0", "false")
     if gold_fields:
         decider += " on GOLD fields"
+    mode = mode_name(settings.decide_mode, gold_fields)
+    cache_dir = cache_dir_for(mode)
     cases = select_cases(load_cases(), os.environ.get("EVAL_CASES", ""))
     graph = build_graph()
-    rows = [run_case(graph, case, gold_fields) for case in cases]
+    rows, stopped = run_all(graph, cases, gold_fields, cache_dir)
     summary = summarise(rows)
     reader = default_reader().describe()  # after the run, so the revision and load time are known
-    print_scorecard(summary, rows, reader, decider)
-    LAST_RUN_PATH.write_text(json.dumps({"pii_model": reader, "decide": decider, **summary}, indent=2) + "\n", encoding="utf-8")
+    print_scorecard(summary, rows, reader, decider, mode)
+    if stopped:
+        print(f"\nDaily Gemini quota reached: {summary['answered']} of {len(cases)} done, resume tomorrow with: {resume_command(settings.decide_mode, gold_fields)}")
+    LAST_RUN_PATH.write_text(json.dumps({"pii_model": reader, "decide": decider, "mode": mode, **summary}, indent=2) + "\n", encoding="utf-8")
     if langsmith_client() is not None:
         langsmith_client().flush()
         print(f"  traces: LangSmith project {settings.langsmith_project} (12-digit numbers masked by the anonymizer)")

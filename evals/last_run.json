@@ -1,7 +1,11 @@
 {
-  "pii_model": "VK1402/AADHAAR_Extractor @ 0.30, revision 7cfbd719a7ce62be4c3898f9e8880d292224d772, loaded in 13.4 s",
+  "pii_model": "VK1402/AADHAAR_Extractor @ 0.30, revision 7cfbd719a7ce62be4c3898f9e8880d292224d772, loaded in 17.8 s",
   "decide": "rules",
+  "mode": "rules",
   "cases": 30,
+  "answered": 30,
+  "cached": 0,
+  "complete": true,
   "decision_accuracy": 0.9,
   "decision_hits": 27,
   "decision_rules_accuracy": 0.9,

@@ -14,6 +14,7 @@ is not `done`.
 | 6 LangSmith | done | tracer attached through run_config with the 12-digit anonymizer; dataset `kyc-compliance-agent-cases` (masked documents) uploaded; experiment `kyc-rules-a3974733` run against it |
 | 7 prove which model runs | done | scorecard header prints the PII model id, the Hugging Face revision actually loaded and the load time; `evals/model_check.py` shows one case with and without the model |
 | 8 fix the threshold leak | done | `evals/split.json` tune/test halves (15/15, unlabelled 9/8); sweep picks on tune (0.30), reports test half 139/140 = 0.9929; default unchanged |
+| 9 resumable LLM evals | done | per-case cache `evals/llm_cache/<mode>/`, clean stop on a daily-quota 429 with the resume command, "partial: N/30" until complete, citation-meaning line per mode |
 | Docs | done | README.md (graph, how to run, scorecard tables, limits), docs/WALKTHROUGH.md (per node, case 24 states, syntax), CLAUDE.md roadmap |
 
 ## Scorecards, one line per commit
@@ -247,3 +248,18 @@ any overlap against a guessed candidate.
 - Result: tune half best 0.30 (137/139, tie with 0.20) -> test half 139/140 = 0.9929; tuned on
   itself 0.30 -> 276/279 = 0.9892. **The default PII_THRESHOLD stays 0.30**; nothing changed.
   Per threshold (all 30): 0.20 276, 0.30 276, 0.40 275, 0.50 275, 0.70 275, 0.90 274, 0.99 272.
+
+## Item 9: resumable LLM evals (done, 31-10-2026)
+
+- `evals/run_evals.py`: `mode_name` (rules / llm / agent / agent-gold), `cache_dir_for`,
+  `read_cached` / `write_cached` (decision, citations, reason, rules verdict, the decide and
+  human_review audit entries, a timestamp; never the extracted fields), `final_from_cache`
+  (extraction live, decision from the file), `extraction_only` (cases after a quota stop),
+  `is_daily_quota`, `run_all` (stops caching and deciding after the first daily-quota 429),
+  `resume_command`. The rules mode is never cached.
+- An answer the model did not give (quota or any error) is not cached and not counted: the
+  scorecard lists those cases under "LLM not answered", prints "partial: N/30" for the
+  decision accuracy and the citation hit rate until all 30 are cached, and "LLM answers cached
+  N/30" for what was reused. A daily-quota stop prints "N of 30 done, resume tomorrow with:
+  <command>" and exits 0. Extraction numbers still cover all 30 cases after a stop.
+- Under the citation number one line says what it measures in that mode (`CITATION_MEANING`).

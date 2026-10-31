@@ -46,7 +46,12 @@ Knobs (all in `.env.example`): `DECIDE_MODE=rules|llm|agent`, `GEMINI_MODEL`,
 `RBI_PDF_PATH`, `CHECKPOINT_DB`. Eval-only: `EVAL_CASES=case-01,case-15` for a subset,
 `EVAL_GOLD_FIELDS=1` to decide on the expected fields, `LOG_LEVEL=INFO` for one line per case.
 `evals/langsmith_dataset.py` uploads the cases as a LangSmith dataset (masked) and runs the
-scorecard against it; `evals/sweep_threshold.py` sweeps the PII-model threshold.
+scorecard against it; `evals/sweep_threshold.py` sweeps the PII-model threshold on the tune half.
+
+LLM and agent runs are resumable: every answered case is cached under `evals/llm_cache/<mode>/`
+and a rerun skips it; when the Gemini daily quota is hit the run stops, prints
+"N of 30 done, resume tomorrow with: <command>" and exits 0. A mode's decision accuracy is only
+printed once all 30 cases are cached; before that the scorecard says "partial: N/30".
 
 ## Scorecard
 
