@@ -5,7 +5,7 @@ Encoder model      : microsoft/deberta-v3-base
 Counting layer     : count_lstm_v2
 Token pooling      : first
 ============================================================
-KYC EVALS - 30 cases (PII model: VK1402/AADHAAR_Extractor @ 0.30, revision 7cfbd719a7ce62be4c3898f9e8880d292224d772, loaded in 17.8 s; decide: rules)
+KYC EVALS - 30 cases (PII model: VK1402/AADHAAR_Extractor @ 0.30, revision 7cfbd719a7ce62be4c3898f9e8880d292224d772, loaded in 22.3 s; decide: rules)
   decision accuracy       27/30 = 0.9000 (decide node, mode rules)
   decision, rules only    27/30 = 0.9000 (plain-code baseline, R1-R8 except R6)
   human_review            paused and auto-resumed by eval-auto in 19/30 cases (no human in an eval run)
@@ -37,4 +37,3 @@ Misses: 5 of 30 cases
   case-22  escalate -> 'approve'        0/1        9/10     9/10     ok        ok
   case-23  escalate -> 'approve'        0/1        9/9      9/9      ok        ok
   case-29  escalate -> 're_kyc'         1/2        9/9      9/9      ok        ok
-  traces: LangSmith project kyc-compliance-agent (12-digit numbers masked by the anonymizer)

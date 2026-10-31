@@ -30,4 +30,12 @@ Rules source: RBI/DOR/2025-26/361, dated 28 Nov 2025, updated as on 29 Dec 2025,
 5. DONE 30 Oct. `human_review`: `interrupt()` + checkpointer (memory, or SQLite via `CHECKPOINT_DB`); the evals auto-resume as `eval-auto` and the scorecard says in how many cases.
 6. DONE 30 Oct. LangSmith tracing when `LANGSMITH_API_KEY` is set, through the 12-digit anonymizer; cases uploaded (masked) as dataset `kyc-compliance-agent-cases`; experiment `kyc-rules-a3974733` run against it.
 
-Next, when a billed Gemini key is available: the four 30-case decision numbers (rules, LLM without tools, LLM with tools, LLM with tools on gold fields), commands in `docs/PROGRESS.md`.
+7. DONE 31 Oct. Prove which model runs: the scorecard header names the PII model id, the Hugging Face revision actually loaded and the load time; `evals/model_check.py` shows one case with and without the model.
+8. DONE 31 Oct. Threshold leak fixed: `evals/split.json` (tune/test halves, balanced on `unlabelled`); `evals/sweep_threshold.py` chooses on the tune half (0.30) and reports the test half (139/140) next to the full-30 number (276/279, tuned on itself). Default unchanged.
+9. DONE 31 Oct. Resumable LLM evals: per-case cache in `evals/llm_cache/<mode>/`, clean stop on a daily-quota 429 with the resume command, "partial: N/30" until all 30 are cached, a what-it-measures line under the citation number.
+10. PARTIAL 31 Oct (quota). The four decision numbers on gemini-2.5-flash-lite: rules 27/30; llm partial 23/30 cached; agent 0/30; agent on gold fields 0/30. Resume commands in `docs/PROGRESS.md` and the README.
+11. DONE 31 Oct. No full Aadhaar in any checkpoint: `checkpoints.MaskingSerializer` masks 12-digit runs when the memory or SQLite saver serializes; a test reads the raw SQLite bytes.
+12. DONE 31 Oct. Final docs: README (graph, run, resume, results table, limits), `docs/LEARN.md` (every file, what calls what, every piece of syntax), this roadmap.
+13. Merge: a PR from `claude/kyc-build` into `main`, merged with a merge commit so the one-commit-per-item history stays.
+
+Still open: finishing the llm, agent and agent-on-gold runs (20 Gemini calls a day on this key, or one run each with a billed key).

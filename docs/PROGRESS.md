@@ -17,6 +17,8 @@ is not `done`.
 | 9 resumable LLM evals | done | per-case cache `evals/llm_cache/<mode>/`, clean stop on a daily-quota 429 with the resume command, "partial: N/30" until complete, citation-meaning line per mode |
 | 10 the four decision numbers | partial, quota-bound | rules 27/30; llm partial 23/30 cached; agent 0/30; agent-gold 0/30. Resume commands below; 20 Gemini calls per day on this key |
 | 11 no full Aadhaar in any checkpoint | done | `checkpoints.MaskingSerializer` masks 12-digit runs at serialization for the memory and SQLite savers; test reads the raw SQLite bytes |
+| 12 final docs | done | README final state with one results table (test half before tuned-on-itself), `docs/LEARN.md`, CLAUDE.md roadmap 7-13 |
+| 13 merge | this session | PR from `claude/kyc-build` into `main`, merge commit (history kept) |
 | Docs | done | README.md (graph, how to run, scorecard tables, limits), docs/WALKTHROUGH.md (per node, case 24 states, syntax), CLAUDE.md roadmap |
 
 ## Scorecards, one line per commit
@@ -321,3 +323,22 @@ any overlap against a guessed candidate.
 - Not covered: a resume from the extract checkpoint after a crash would give validate the
   masked value, so the R3 error would not be recorded on that resumed run (the audit entry of
   extract still shows the fields it found). Everything stored is masked, which was the point.
+
+## Item 12: final docs (done, 31-10-2026)
+
+- README rewritten for the final state: the graph, how to run, how to resume the evals, one
+  results table (rules 27/30; llm partial 23/30 with 23 cached; agent and agent-on-gold
+  partial 0/30; extraction on the held-out test half 139/140 listed before the tuned-on-itself
+  276/279; regex only 269/279; citation hit rate 0.8529 in rules mode; validate on extracted
+  30/30), safety, limits. Mechanism words only.
+- `docs/LEARN.md`: every file under `src/kyc_agent/` and `evals/` in reading order, what each
+  does in two lines, which functions call which, and every piece of syntax each file uses, one
+  line each. Built from an AST pass over the files, then written out by hand.
+- CLAUDE.md roadmap: items 7-13 added and marked.
+- The one rules-mode scorecard of this session is in the item 12 commit message.
+
+## Item 13: merge
+
+- A PR from `claude/kyc-build` into `main`, merged with a merge commit (not a squash) so the
+  one-commit-per-item history stays on `main`. Opened and merged at the end of this session;
+  the resume commands above still apply on `main`.
